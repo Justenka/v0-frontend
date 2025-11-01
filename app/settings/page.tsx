@@ -65,7 +65,7 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Profile Settings */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Profilio informacija</CardTitle>
             <CardDescription>Atnaujinkite savo profilio informaciją</CardDescription>
@@ -81,7 +81,7 @@ export default function SettingsPage() {
             </div>
             <Button onClick={handleSaveProfile}>Išsaugoti pakeitimus</Button>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Notification Settings */}
         <Card>
@@ -153,7 +153,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Password Change */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Slaptažodis</CardTitle>
             <CardDescription>Pakeiskite savo slaptažodį</CardDescription>
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           <CardContent>
             <Button variant="outline">Keisti slaptažodį</Button>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </div>
   )
