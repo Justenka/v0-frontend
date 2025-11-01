@@ -1,8 +1,5 @@
 "use client"
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { PlusCircle, UserCircle, LogIn } from "lucide-react"
 import GroupsList from "@/components/groups-list"
 import { useState, useEffect } from "react"
 import SetYourNameDialog from "@/components/set-name-dialog"
@@ -20,7 +17,6 @@ export default function HomePage() {
       try {
         const name = await userApi.getUserName()
         setYourName(name)
-
         if (!name && !user) {
           setIsNameDialogOpen(true)
         }
@@ -45,38 +41,29 @@ export default function HomePage() {
 
   const displayName = user?.name || yourName
 
-  return (
-    <div className="container max-w-4xl py-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Mano grupės</h1>
-        <div className="flex gap-2">
-          {!user && (
-            <Link href="/login">
-              <Button variant="outline">
-                <LogIn className="h-4 w-4 mr-2" />
-                Prisijungti
-              </Button>
-            </Link>
-          )}
-          {!user && (
-            <Button
-              variant="outline"
-              onClick={() => setIsNameDialogOpen(true)}
-              className="flex items-center gap-2"
-              disabled={isLoading}
-            >
-              <UserCircle className="h-4 w-4" />
-              {isLoading ? "Kraunama..." : displayName ? displayName : "Nustatyti vardą"}
-            </Button>
-          )}
-          <Link href="/groups/new">
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Sukurti grupę
-            </Button>
-          </Link>
+  // 👇 Jei vartotojas nėra prisijungęs — rodom tik intro
+  if (!user) {
+    return (
+      <div className="container max-w-5xl py-20">
+        <div className="text-center bg-gradient-to-b from-gray-50 to-white rounded-2xl p-12 shadow-sm border border-gray-200">
+          <h1 className="text-5xl font-extrabold mb-6 text-gray-900">Skolų Departamentas</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            Sveiki atvykę į jūsų asmeninį skolų ir grupinių išlaidų valdymo įrankį.
+            Sekite, kam esate skolingi, matykite grupės balansus realiu laiku ir lengvai 
+            dalinkitės išlaidomis su draugais, kolegomis ar šeimos nariais.
+          </p>
         </div>
       </div>
+    )
+  }
+
+  // 👇 Jei vartotojas prisijungęs — rodom tik grupių puslapį
+  return (
+    <div className="container max-w-5xl py-10">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-3xl font-semibold text-gray-900">Mano grupės</h2>
+      </div>
+
       <GroupsList yourName={displayName} />
 
       <SetYourNameDialog
