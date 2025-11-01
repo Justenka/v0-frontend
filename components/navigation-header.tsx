@@ -15,14 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Bell, MessageSquare, Users, LogOut, Settings, User, Languages } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { useLanguage } from "@/contexts/language-context"
 import { mockNotifications } from "@/lib/mock-data"
 
 export function NavigationHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
-  const { language, setLanguage, t } = useLanguage() // Added language context
 
   // Don't show header on login/register pages
   if (pathname === "/login" || pathname === "/register") {
@@ -58,19 +56,19 @@ export function NavigationHeader() {
                 <Link href="/">
                   <Button variant={pathname === "/" ? "default" : "ghost"} size="sm">
                     <Users className="h-4 w-4 mr-2" />
-                    {t("groups")}
+                    {("Grupės")}
                   </Button>
                 </Link>
                 <Link href="/messages">
                   <Button variant={pathname === "/messages" ? "default" : "ghost"} size="sm">
                     <MessageSquare className="h-4 w-4 mr-2" />
-                    {t("messages")}
+                    {("Žinutės")}
                   </Button>
                 </Link>
                 <Link href="/friends">
                   <Button variant={pathname === "/friends" ? "default" : "ghost"} size="sm">
                     <User className="h-4 w-4 mr-2" />
-                    {t("friends")}
+                    {("Draugai")}
                   </Button>
                 </Link>
               </nav>
@@ -80,28 +78,6 @@ export function NavigationHeader() {
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Languages className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => setLanguage("en")}
-                      className={language === "en" ? "bg-accent" : ""}
-                    >
-                      🇬🇧 English
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setLanguage("lt")}
-                      className={language === "lt" ? "bg-accent" : ""}
-                    >
-                      🇱🇹 Lietuvių
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
                 {/* Notifications */}
                 <Link href="/notifications">
                   <Button variant="ghost" size="icon" className="relative">
@@ -137,16 +113,16 @@ export function NavigationHeader() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => router.push("/profile")}>
                       <User className="mr-2 h-4 w-4" />
-                      {t("profile")}
+                      {("Profilis")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => router.push("/settings")}>
                       <Settings className="mr-2 h-4 w-4" />
-                      {t("settings")}
+                      {("Nustatymai")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
-                      {t("logout")}
+                      {("Atsijungti")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
