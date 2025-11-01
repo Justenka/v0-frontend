@@ -43,7 +43,7 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  // const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [userName, setUserName] = useState("")
 
   const currentUserPermission = mockGroupPermissions.find(
@@ -221,12 +221,12 @@ export default function GroupPage() {
                 </Button>
               </Link>
             )}
-            {userRole !== "guest" && (
+            {/* {userRole !== "guest" && (
               <Button variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
                 <DollarSign className="h-4 w-4 mr-2" />
                 Registruoti mokėjimą
               </Button>
-            )}
+            )} */}
             <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Nustatymai
@@ -323,12 +323,12 @@ export default function GroupPage() {
         currentUserRole={userRole}
       />
 
-      <RegisterPaymentDialog
+      {/* <RegisterPaymentDialog
         open={isPaymentDialogOpen}
         onOpenChange={setIsPaymentDialogOpen}
         members={members}
         onRegisterPayment={handleRegisterPayment}
-      />
+      /> */}
     </div>
   )
 }
