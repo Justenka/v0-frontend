@@ -19,11 +19,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="lt">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </head>
       <body className="bg-gray-50 text-gray-900">
         <LanguageProvider>
           <AuthProvider>
             <NavigationHeader />
-            <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+            <main className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center"> {children}</main>
             <Toaster />
           </AuthProvider>
         </LanguageProvider>
