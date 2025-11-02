@@ -19,6 +19,7 @@ import { userApi, groupApi } from "@/services/api-client"
 import { Stepper, StepContent } from "@/components/ui/stepper"
 import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
 import { supportedCurrencies } from "@/lib/currency-api"
+import { mockCategories } from "@/lib/mock-data"
 
 export default function NewTransactionPage() {
   const params = useParams()
@@ -63,6 +64,16 @@ export default function NewTransactionPage() {
   }, [])
 
   useEffect(() => {
+    try {
+      const groupKey = String(groupId)
+      const groupCategories = mockCategories[groupKey] || []
+      setCategories(groupCategories)
+    } catch (error) {
+      console.error("Failed to load mock categories:", error)
+    }
+  }, [groupId])
+
+  useEffect(() => {
     const fetchMembers = async () => {
       try {
         const data = await groupApi.getGroup(groupId)
@@ -77,30 +88,7 @@ export default function NewTransactionPage() {
     if (groupId) fetchMembers()
   }, [groupId])
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        // MOCK: Fetch categories from mock data
-        // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
-        // const response = await fetch(`/api/groups/${groupId}/categories`)
-        // const data = await response.json()
-        // SQL Query:
-        // SELECT id, name FROM categories WHERE group_id = ? ORDER BY name ASC
-
-        const mockCategories = [
-          { id: "c1", name: "Maistas" },
-          { id: "c2", name: "Transportas" },
-          { id: "c3", name: "Pramogos" },
-          { id: "c4", name: "Būstas" },
-        ]
-        setCategories(mockCategories)
-      } catch (error) {
-        console.error("Failed to fetch categories:", error)
-      }
-    }
-
-    if (groupId) fetchCategories()
-  }, [groupId])
+  
 
   const [percentages, setPercentages] = useState<Record<number, string>>({})
   const [amounts, setAmounts] = useState<Record<number, string>>({})
