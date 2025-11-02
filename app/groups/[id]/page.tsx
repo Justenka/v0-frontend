@@ -28,14 +28,15 @@ import { userApi, groupApi } from "@/services/api-client"
 import { useAuth } from "@/contexts/auth-context"
 import { mockGroupPermissions, mockUsers } from "@/lib/mock-data"
 import type { UserRole } from "@/types/user"
-import PaymentHistory from "@/components/payment-history" // Added payment history import
+import PaymentHistory from "@/components/payment-history"
+import { mockCategories } from "@/lib/mock-data"
 
 export default function GroupPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
-
+  const categories = mockCategories[groupId] || []
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -265,7 +266,8 @@ export default function GroupPage() {
                 transactions={transactions}
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
-                onDelete={handleDeleteTransaction} members={[]} categories={[]}              />
+                categories={categories}
+                onDelete={handleDeleteTransaction} members={[]}/>
             </CardContent>
           </Card>
         </TabsContent>

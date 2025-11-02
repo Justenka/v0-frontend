@@ -64,25 +64,6 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-8">Nustatymai</h1>
 
       <div className="space-y-6">
-        {/* Profile Settings */}
-        {/* <Card>
-          <CardHeader>
-            <CardTitle>Profilio informacija</CardTitle>
-            <CardDescription>Atnaujinkite savo profilio informaciją</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Vardas</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">El. paštas</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <Button onClick={handleSaveProfile}>Išsaugoti pakeitimus</Button>
-          </CardContent>
-        </Card> */}
-
         {/* Notification Settings */}
         <Card>
           <CardHeader>
@@ -151,17 +132,6 @@ export default function SettingsPage() {
             <Button onClick={handleSaveNotifications}>Išsaugoti nustatymus</Button>
           </CardContent>
         </Card>
-
-        {/* Password Change */}
-        {/* <Card>
-          <CardHeader>
-            <CardTitle>Slaptažodis</CardTitle>
-            <CardDescription>Pakeiskite savo slaptažodį</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline">Keisti slaptažodį</Button>
-          </CardContent>
-        </Card> */}
       </div>
     </div>
   )
