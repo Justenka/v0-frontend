@@ -188,15 +188,13 @@ export default function MessagesPage() {
                     const isOwnMessage = message.senderId === user.id
                     return (
                       <div key={message.id} className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[70%] ${isOwnMessage ? "items-end" : "items-start"} flex flex-col`}>
-                          <div
-                            className={`rounded-lg px-4 py-2 ${
-                              isOwnMessage ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                          </div>
-                          <span className="text-xs text-gray-500 mt-1">
+                        <div
+                          className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                            isOwnMessage ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                          <span className={`text-xs mt-1 block ${isOwnMessage ? "text-blue-100" : "text-gray-500"}`}>
                             {formatDistanceToNow(message.timestamp, { addSuffix: true, locale: lt })}
                           </span>
                         </div>

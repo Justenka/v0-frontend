@@ -94,7 +94,7 @@ export default function AddMemberDialog({ open, onOpenChange, onAddMember, exist
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Member</DialogTitle>
           <DialogDescription>Add a new member to this group from your friends or by username/email.</DialogDescription>
@@ -107,19 +107,19 @@ export default function AddMemberDialog({ open, onOpenChange, onAddMember, exist
           </Alert>
         )}
 
-        <Tabs defaultValue="friends" className="w-full">
+        <Tabs defaultValue="friends" className="w-full flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="friends">From Friends</TabsTrigger>
             <TabsTrigger value="manual">By Username/Email</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="friends" className="space-y-4">
+          <TabsContent value="friends" className="space-y-4 flex-1 overflow-y-auto">
             {friends.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 You don't have any friends yet. Add friends to invite them to groups!
               </p>
             ) : (
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              <div className="space-y-2">
                 {friends.map((friend) => (
                   <button
                     key={friend.id}
@@ -149,7 +149,7 @@ export default function AddMemberDialog({ open, onOpenChange, onAddMember, exist
             )}
           </TabsContent>
 
-          <TabsContent value="manual">
+          <TabsContent value="manual" className="flex-1 overflow-y-auto">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Username</Label>

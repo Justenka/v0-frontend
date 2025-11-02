@@ -34,11 +34,11 @@ export default function NewGroupPage() {
 
     try {
       console.log("[v0] Creating group:", title)
-      const newGroup = await groupApi.createGroup(title)
+      const newGroup = await groupApi.createGroup(title, user.id)
       console.log("[v0] Group created successfully:", newGroup)
       toast.success("Group created successfully!")
       router.push("/")
-      router.refresh() // Force refresh to show new group
+      router.refresh()
     } catch (error) {
       console.error("[v0] Failed to create group:", error)
       toast.error("Failed to create group. Please try again.")

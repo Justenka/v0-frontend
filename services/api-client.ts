@@ -41,9 +41,9 @@ export const groupApi = {
   },
 
   // Create a new group
-  createGroup: async (title: string) => {
+  createGroup: async (title: string, userId: string) => {
     await delay()
-    return addMockGroup(title)
+    return addMockGroup(title, userId)
   },
 
   // Add a member to a group

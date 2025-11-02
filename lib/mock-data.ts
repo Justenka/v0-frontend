@@ -651,15 +651,47 @@ export const getGroupById = (id: number): Group | undefined => {
 
 // Helper function to add a new group
 let nextGroupId = 4
-export const addMockGroup = (title: string): Group => {
+export const addMockGroup = (title: string, creatorId = "1"): Group => {
+  const creator = mockUsers.find((u) => u.id === creatorId)
+  const creatorName = creator?.name || "Unknown"
+
   const newGroup: Group = {
-    id: nextGroupId++,
+    id: nextGroupId,
     title,
     balance: 0,
-    members: [],
+    members: [
+      {
+        id: nextMemberId++,
+        name: creatorName,
+        balance: 0,
+      },
+    ],
   }
+
+  // Add group permission for creator as admin
+  mockGroupPermissions.push({
+    groupId: String(nextGroupId),
+    userId: creatorId,
+    role: "admin",
+  })
+
+  // Add activity log for group creation
+  mockActivities.push({
+    id: `a${mockActivities.length + 1}`,
+    groupId: String(nextGroupId),
+    userId: creatorId,
+    userName: creatorName,
+    type: "group_created",
+    description: `Sukūrė grupę "${title}"`,
+    timestamp: new Date(),
+  })
+
   mockGroups.push(newGroup)
   mockTransactions[newGroup.id] = []
+  mockCategories[String(newGroup.id)] = []
+  mockGroupMessages[String(newGroup.id)] = []
+
+  nextGroupId++
   return newGroup
 }
 
