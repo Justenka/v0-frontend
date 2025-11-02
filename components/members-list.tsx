@@ -45,21 +45,21 @@ export default function MembersList({ members, onSettleUp, onRemoveMember }: Mem
         return (
           <div key={member.id} className="flex items-center justify-between py-3 border-b last:border-0">
             <div>
-              <p className="font-medium">{isCurrentUser ? "You" : member.name}</p>
+              <p className="font-medium">{isCurrentUser ? "Jūs" : member.name}</p>
               {member.balance !== 0 && (
                 <p className="text-sm text-muted-foreground">
                   {member.name === userName ? (
                     member.balance > 0
-                      ? `You are owed ${formatCurrency(member.balance)}`
+                      ? `Jums priklauso ${formatCurrency(member.balance)}`
                       : member.balance < 0
-                      ? `You owe ${formatCurrency(Math.abs(member.balance))}`
-                      : "You owe nothing"
+                      ? `Jūs skolingi ${formatCurrency(Math.abs(member.balance))}`
+                      : "Jūs neskolingi"
                   ) : (
                     member.balance > 0
-                      ? `Owed ${formatCurrency(member.balance)}`
+                      ? `Jiems priklauso ${formatCurrency(member.balance)}`
                       : member.balance < 0
-                      ? `Owe ${formatCurrency(Math.abs(member.balance))}`
-                      : "Settled up"
+                      ? `Skolingas ${formatCurrency(Math.abs(member.balance))}`
+                      : "Atsiskaites"
                   )}
                 </p>
               )}
@@ -75,20 +75,20 @@ export default function MembersList({ members, onSettleUp, onRemoveMember }: Mem
                     !isCurrentUser
                       ? "Only the person who owes can settle"
                       : member.balance >= 0
-                      ? "You don’t owe anything"
+                      ? "Jūs niekam neskolingi"
                       : ""
                   }
                 >
-                  Settle Up
+                  Gražinti
                 </Button>
               )}
                 <Button
                   variant="destructive"
                   onClick={() => onRemoveMember(member.id)}
                   disabled={member.balance !== 0}
-                  title={member.balance !== 0 ? "Cannot remove member with unsettled balance" : ""}
+                  title={member.balance !== 0 ? "Negalima pašalinti nario kol jis pilnai neatsiskaitęs" : ""}
                 >
-                  Remove
+                  Pašalinti
                 </Button>
             </div>
           </div>

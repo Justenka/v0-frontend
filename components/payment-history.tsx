@@ -25,9 +25,9 @@ export default function PaymentHistory({ groupId, transactionId }: PaymentHistor
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Payment History</CardTitle>
+        <CardTitle className="text-lg">Mokėjimų istorija</CardTitle>
         <CardDescription>
-          {transactionId ? "Payments for this transaction" : "Recent payments in this group"}
+          {transactionId ? "Mokėjimai už šią operaciją" : "Naujausi mokėjimai šioje grupėje"}
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -79,10 +79,10 @@ export default function GroupsList({ yourName }: GroupsListProps) {
                 <h3 className="font-medium">{group.title}</h3>
                 <Badge variant={yourBalance === 0 ? "outline" : yourBalance > 0 ? "success" : "destructive"}>
                   {yourBalance > 0
-                    ? `You are owed ${formatCurrency(yourBalance)}`
+                    ? `Jums priklauso ${formatCurrency(yourBalance)}`
                     : yourBalance < 0
-                      ? `You owe ${formatCurrency(Math.abs(yourBalance))}`
-                      : `Settled`}
+                      ? `Jūs skolingi ${formatCurrency(Math.abs(yourBalance))}`
+                      : `Atsiskaityta`}
                 </Badge>
               </CardContent>
             </Card>

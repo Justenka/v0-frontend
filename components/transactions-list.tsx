@@ -32,6 +32,7 @@ export default function TransactionsList({
 }: TransactionsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterBy, setFilterBy] = useState<string>("all")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all") // 🆕 NEW STATE
   const [sortBy, setSortBy] = useState<string>("date-desc")
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -44,8 +45,14 @@ export default function TransactionsList({
     const matchesSearch =
       transaction.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       transaction.paidBy.toLowerCase().includes(searchQuery.toLowerCase())
+
     const matchesFilter = filterBy === "all" || transaction.paidBy === filterBy
-    return matchesSearch && matchesFilter
+
+    // 🆕 NEW: Filter by category
+    const matchesCategory =
+      categoryFilter === "all" || transaction.categoryId === categoryFilter
+
+    return matchesSearch && matchesFilter && matchesCategory
   })
 
   // Sort transactions
@@ -102,11 +109,12 @@ export default function TransactionsList({
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {/* Filter by payer */}
             <Select value={filterBy} onValueChange={setFilterBy}>
               <SelectTrigger className="w-[140px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Pagal mokėtoją" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Visi</SelectItem>
@@ -117,6 +125,23 @@ export default function TransactionsList({
                 ))}
               </SelectContent>
             </Select>
+
+            {/* 🆕 Filter by category */}
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Pagal kategoriją" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Visos kategorijos</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Sort by */}
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
@@ -132,7 +157,7 @@ export default function TransactionsList({
         </div>
 
         {/* Results count */}
-        {searchQuery || filterBy !== "all" ? (
+        {searchQuery || filterBy !== "all" || categoryFilter !== "all" ? (
           <p className="text-sm text-gray-600">
             Rasta {sortedTransactions.length} iš {transactions.length} išlaidų
           </p>
