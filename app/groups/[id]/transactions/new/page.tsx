@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import toast from "react-hot-toast" // Import toast for notifications
+import toast from "react-hot-toast"
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -21,7 +21,7 @@ import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
 import { supportedCurrencies } from "@/lib/currency-api"
 import { mockCategories } from "@/lib/mock-data"
 
-export default function NewTransactionPage() {
+export default function NaujaIslaidaPuslapis() {
   const params = useParams()
   const router = useRouter()
   const groupId = Number(params.id)
@@ -44,9 +44,8 @@ export default function NewTransactionPage() {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
 
-  // Stepper state
   const [currentStep, setCurrentStep] = useState(0)
-  const steps = ["Details", "Paid By", "Split", "Review"]
+  const steps = ["Duomenys", "Kas mokėjo", "Dalinimas", "Peržiūra"]
 
   useEffect(() => {
     const fetchUserName = async () => {
@@ -54,7 +53,7 @@ export default function NewTransactionPage() {
         const name = await userApi.getUserName()
         setUserName(name)
       } catch (error) {
-        console.error("Failed to fetch user name:", error)
+        console.error("Nepavyko gauti vartotojo vardo:", error)
       } finally {
         setIsLoadingUser(false)
       }
@@ -69,7 +68,7 @@ export default function NewTransactionPage() {
       const groupCategories = mockCategories[groupKey] || []
       setCategories(groupCategories)
     } catch (error) {
-      console.error("Failed to load mock categories:", error)
+      console.error("Nepavyko įkelti kategorijų:", error)
     }
   }, [groupId])
 
@@ -81,38 +80,32 @@ export default function NewTransactionPage() {
           setMembers(data.members || [])
         }
       } catch (error) {
-        console.error("Error loading members:", error)
+        console.error("Klaida įkeliant narius:", error)
       }
     }
 
     if (groupId) fetchMembers()
   }, [groupId])
 
-  
-
   const [percentages, setPercentages] = useState<Record<number, string>>({})
   const [amounts, setAmounts] = useState<Record<number, string>>({})
 
-  // Step validation
   const canGoToNextStep = () => {
     switch (currentStep) {
-      case 0: // Details
+      case 0:
         return title.trim() !== "" && amount.trim() !== "" && Number.parseFloat(amount) > 0
-      case 1: // Paid By
+      case 1:
         return paidBy !== ""
-      case 2: // Split
+      case 2:
         if (splitType === "equal") return true
         if (splitType === "percentage") return isPercentageValid()
         if (splitType === "dynamic") return isDynamicValid()
         return false
-      case 3: // Review
-        return true
       default:
-        return false
+        return true
     }
   }
 
-  // Navigation functions
   const goToNextStep = () => {
     if (currentStep < steps.length - 1 && canGoToNextStep()) {
       setCurrentStep(currentStep + 1)
@@ -126,7 +119,6 @@ export default function NewTransactionPage() {
   }
 
   const goToStep = (step: number) => {
-    // Only allow going to steps that are valid to navigate to
     if (step <= currentStep || (step === currentStep + 1 && canGoToNextStep())) {
       setCurrentStep(step)
     }
@@ -142,7 +134,7 @@ export default function NewTransactionPage() {
 
     if (!title.trim() || !amount || !paidBy) return
     if (!userName) {
-      alert("Please set your name before creating a transaction")
+      alert("Prieš kuriant išlaidą, nustatykite savo vardą")
       router.push("/")
       return
     }
@@ -150,68 +142,26 @@ export default function NewTransactionPage() {
     setIsSubmitting(true)
 
     try {
-      let splitTypeDescription = "Equally"
-      if (splitType === "equal") {
-        splitTypeDescription = `Equally among ${members.length} people`
-      } else if (splitType === "percentage") {
-        splitTypeDescription = "By percentage"
+      let splitTypeDescription = "Lygiomis dalimis"
+      if (splitType === "percentage") {
+        splitTypeDescription = "Pagal procentus"
       } else if (splitType === "dynamic") {
-        splitTypeDescription = "Custom amounts"
+        splitTypeDescription = "Pagal konkrečias sumas"
       }
 
       await groupApi.addTransaction(groupId, title, Number.parseFloat(amount), paidBy, splitTypeDescription, categoryId)
 
+      toast.success("Išlaida sėkmingai pridėta!")
       router.push(`/groups/${groupId}`)
     } catch (error) {
-      console.error("Failed to create transaction:", error)
-      alert("Failed to add expense.")
+      console.error("Nepavyko sukurti išlaidos:", error)
+      toast.error("Nepavyko pridėti išlaidos.")
       setIsSubmitting(false)
     }
   }
 
-  const handlePercentageChange = (memberId: number, value: string) => {
-    setPercentages({
-      ...percentages,
-      [memberId]: value,
-    })
-  }
-
-  const handleAmountChange = (memberId: number, value: string) => {
-    setAmounts({
-      ...amounts,
-      [memberId]: value,
-    })
-  }
-
-  const isPercentageValid = () => {
-    if (splitType !== "percentage") return true
-    const total = Object.values(percentages).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
-    return Math.abs(total - 100) < 0.01
-  }
-
-  const isDynamicValid = () => {
-    if (splitType !== "dynamic") return true
-    const totalSplit = Object.values(amounts).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
-    return Math.abs(totalSplit - Number.parseFloat(amount || "0")) < 0.01
-  }
-
-  const handleCreateCategory = async () => {
+  const handleCreateCategory = () => {
     if (!newCategoryName.trim()) return
-
-    // MOCK: Create new category
-    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
-    // const response = await fetch('/api/categories/create', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     groupId,
-    //     name: newCategoryName,
-    //     createdBy: userId
-    //   })
-    // })
-    // SQL Query:
-    // INSERT INTO categories (id, name, group_id, created_by, created_at)
-    // VALUES (UUID(), ?, ?, ?, NOW())
 
     const newCategory = {
       id: `c${Date.now()}`,
@@ -221,30 +171,42 @@ export default function NewTransactionPage() {
     setCategoryId(newCategory.id)
     setNewCategoryName("")
     setIsCreatingCategory(false)
-    toast.success("Kategorija sukurta") // Use toast to show success message
+    toast.success("Kategorija sukurta")
   }
 
-  // Calculate split amounts for display in review step
+  const handlePercentageChange = (memberId: number, value: string) => {
+    setPercentages({ ...percentages, [memberId]: value })
+  }
+
+  const handleAmountChange = (memberId: number, value: string) => {
+    setAmounts({ ...amounts, [memberId]: value })
+  }
+
+const isPercentageValid = () => {
+  if (splitType !== "percentage") return true
+  const total = Object.values(percentages).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
+  return Math.abs(total - 100) < 0.01
+}
+
+const isDynamicValid = () => {
+  if (splitType !== "dynamic") return true
+  const totalSplit = Object.values(amounts).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
+  return Math.abs(totalSplit - Number.parseFloat(amount || "0")) < 0.01
+}
+
   const calculateSplitAmounts = () => {
     if (!amount || isNaN(Number.parseFloat(amount))) return []
-
     const totalAmount = Number.parseFloat(amount)
 
     if (splitType === "equal") {
       const perPerson = totalAmount / members.length
-      return members.map((member) => ({
-        name: member.name,
-        amount: perPerson,
-      }))
+      return members.map((member) => ({ name: member.name, amount: perPerson }))
     }
 
     if (splitType === "percentage") {
       return members.map((member) => {
         const percentage = Number.parseFloat(percentages[member.id] || "0")
-        return {
-          name: member.name,
-          amount: (totalAmount * percentage) / 100,
-        }
+        return { name: member.name, amount: (totalAmount * percentage) / 100 }
       })
     }
 
@@ -265,27 +227,28 @@ export default function NewTransactionPage() {
         className="text-muted-foreground hover:text-foreground inline-flex items-center mb-6"
       >
         <ArrowLeftCircle className="mr-2 h-4 w-4" />
-        Back to Group
+        Atgal į grupę
       </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>Add New Expense</CardTitle>
-          <CardDescription>Record a new expense for your group.</CardDescription>
+          <CardTitle>Nauja išlaida</CardTitle>
+          <CardDescription>Pridėkite naują grupės išlaidą.</CardDescription>
           <div className="mt-6">
             <Stepper steps={steps} currentStep={currentStep} onStepClick={goToStep} />
           </div>
         </CardHeader>
+
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6 pt-6">
-            {/* Step 1: Transaction Details */}
+            {/* ŽINGSNIS 1: Išlaidos duomenys */}
             <StepContent step={0} currentStep={currentStep}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Expense Title</Label>
+                  <Label htmlFor="title">Pavadinimas</Label>
                   <Input
                     id="title"
-                    placeholder="e.g., Dinner, Groceries, Movie tickets"
+                    placeholder="pvz., Vakarienė, Kuras, Bilietai į kiną"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     required
@@ -294,7 +257,7 @@ export default function NewTransactionPage() {
 
                 <div className="grid grid-cols-[1fr_auto] gap-2">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Total Amount</Label>
+                    <Label htmlFor="amount">Suma</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -361,7 +324,7 @@ export default function NewTransactionPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="late-fee-days">Po dienų</Label>
+                        <Label htmlFor="late-fee-days">Po kiek dienų</Label>
                         <Input
                           id="late-fee-days"
                           type="number"
@@ -430,46 +393,44 @@ export default function NewTransactionPage() {
               </div>
             </StepContent>
 
-            {/* Step 2: Who Paid */}
+            {/* ŽINGSNIS 2 */}
             <StepContent step={1} currentStep={currentStep}>
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="paidBy">Who paid for this expense?</Label>
-                  <Select value={paidBy} onValueChange={setPaidBy}>
-                    <SelectTrigger id="paidBy">
-                      <SelectValue placeholder="Select who paid" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members.map((member) => (
-                        <SelectItem key={member.id} value={member.name}>
-                          {member.name === userName ? "You" : member.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Label htmlFor="paidBy">Kas sumokėjo už šią išlaidą?</Label>
+                <Select value={paidBy} onValueChange={setPaidBy}>
+                  <SelectTrigger id="paidBy">
+                    <SelectValue placeholder="Pasirinkite asmenį" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.name}>
+                        {member.name === userName ? "Aš" : member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </StepContent>
 
-            {/* Step 3: Split Method */}
+            {/* ŽINGSNIS 3 */}
             <StepContent step={2} currentStep={currentStep}>
               <div className="space-y-4">
-                <Label>How to Split</Label>
+                <Label>Kaip padalinti</Label>
                 <Tabs value={splitType} onValueChange={setSplitType} className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="equal">Equal</TabsTrigger>
-                    <TabsTrigger value="percentage">Percentage</TabsTrigger>
-                    <TabsTrigger value="dynamic">Dynamic</TabsTrigger>
+                    <TabsTrigger value="equal">Lygiomis</TabsTrigger>
+                    <TabsTrigger value="percentage">Procentais</TabsTrigger>
+                    <TabsTrigger value="dynamic">Pagal sumą</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="equal" className="pt-4">
                     <p className="text-sm text-muted-foreground">
-                      The total amount will be split equally among all members.
+                      Visa suma bus padalinta lygiomis dalimis tarp visų narių.
                     </p>
                     {amount && (
                       <div className="mt-4 p-4 bg-muted rounded-md">
                         <p className="font-medium">
-                          Each person pays: {formatCurrency(Number.parseFloat(amount) / members.length, currency)}
+                          Kiekvienas moka: {formatCurrency(Number.parseFloat(amount) / members.length, currency)}
                         </p>
                       </div>
                     )}
@@ -477,35 +438,30 @@ export default function NewTransactionPage() {
 
                   <TabsContent value="percentage" className="pt-4">
                     <p className="text-sm text-muted-foreground mb-4">
-                      Specify what percentage each person should pay (total must be 100%).
+                      Nurodykite, kokį procentą turi sumokėti kiekvienas (viso – 100%).
                     </p>
                     <div className="space-y-3">
                       {members.map((member) => (
                         <div key={member.id} className="flex items-center gap-4">
                           <Label className="w-24">{member.name}</Label>
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                placeholder="0"
-                                value={percentages[member.id] || ""}
-                                onChange={(e) => handlePercentageChange(member.id, e.target.value)}
-                              />
-                              <span className="ml-2">%</span>
-                            </div>
-                          </div>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            value={percentages[member.id] || ""}
+                            onChange={(e) => handlePercentageChange(member.id, e.target.value)}
+                          />
+                          <span className="ml-2">%</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* Show total percentage */}
                     <div className="mt-4 p-4 bg-muted rounded-md">
                       <p className="font-medium">
-                        Total:{" "}
+                        Iš viso:{" "}
                         {Object.values(percentages)
-                          .reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0)
+                          .reduce((sum, val) => sum + (Number.parseFloat(val) || 0), 0)
                           .toFixed(2)}
                         %
                       </p>
@@ -514,37 +470,35 @@ export default function NewTransactionPage() {
 
                   <TabsContent value="dynamic" className="pt-4">
                     <p className="text-sm text-muted-foreground mb-4">
-                      Specify the exact amount each person should pay (total must match expense amount).
+                      Nurodykite konkrečią sumą kiekvienam asmeniui (viso turi atitikti bendrą sumą).
                     </p>
                     <div className="space-y-3">
                       {members.map((member) => (
                         <div key={member.id} className="flex items-center gap-4">
                           <Label className="w-24">{member.name}</Label>
-                          <div className="flex-1">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={amounts[member.id] || ""}
-                              onChange={(e) => handleAmountChange(member.id, e.target.value)}
-                            />
-                          </div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={amounts[member.id] || ""}
+                            onChange={(e) => handleAmountChange(member.id, e.target.value)}
+                          />
                         </div>
                       ))}
                     </div>
 
-                    {/* Show total amount */}
+                    {/* Rodoma bendra suma */}
                     <div className="mt-4 p-4 bg-muted rounded-md flex justify-between">
                       <p className="font-medium">
-                        Total:{" "}
+                        Iš viso:{" "}
                         {formatCurrency(
-                          Object.values(amounts).reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0),
+                          Object.values(amounts).reduce((sum, val) => sum + (Number.parseFloat(val) || 0), 0),
                           currency,
                         )}
                       </p>
                       <p className="font-medium">
-                        Expense amount:{" "}
+                        Išlaidos suma:{" "}
                         {amount ? formatCurrency(Number.parseFloat(amount), currency) : `${currency} 0.00`}
                       </p>
                     </div>
@@ -553,32 +507,38 @@ export default function NewTransactionPage() {
               </div>
             </StepContent>
 
-            {/* Step 4: Review */}
+            {/* ŽINGSNIS 4: Peržiūra */}
             <StepContent step={3} currentStep={currentStep}>
               <div className="space-y-6">
-                <h3 className="text-lg font-medium">Review Your Expense</h3>
+                <h3 className="text-lg font-medium">Peržiūrėkite išlaidą</h3>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Expense</p>
+                      <p className="text-sm text-muted-foreground">Pavadinimas</p>
                       <p className="font-medium">{title}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Amount</p>
+                      <p className="text-sm text-muted-foreground">Suma</p>
                       <p className="font-medium">{formatCurrency(Number.parseFloat(amount), currency)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Paid by</p>
-                      <p className="font-medium">{paidBy === userName ? "You" : paidBy}</p>
+                      <p className="text-sm text-muted-foreground">Kas mokėjo</p>
+                      <p className="font-medium">{paidBy === userName ? "Aš" : paidBy}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Split method</p>
-                      <p className="font-medium capitalize">{splitType}</p>
+                      <p className="text-sm text-muted-foreground">Dalinimo būdas</p>
+                      <p className="font-medium capitalize">
+                        {splitType === "equal"
+                          ? "Lygiomis dalimis"
+                          : splitType === "percentage"
+                          ? "Procentais"
+                          : "Pagal sumą"}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Category</p>
-                      <p className="font-medium">{categories.find((cat) => cat.id === categoryId)?.name || "N/A"}</p>
+                      <p className="text-sm text-muted-foreground">Kategorija</p>
+                      <p className="font-medium">{categories.find((cat) => cat.id === categoryId)?.name || "Nenurodyta"}</p>
                     </div>
                   </div>
 
@@ -592,11 +552,11 @@ export default function NewTransactionPage() {
                   )}
 
                   <div className="border-t pt-4">
-                    <p className="text-sm font-medium mb-2">Split details:</p>
+                    <p className="text-sm font-medium mb-2">Dalinimo detalės:</p>
                     <div className="space-y-2">
                       {calculateSplitAmounts().map((split, index) => (
                         <div key={index} className="flex justify-between">
-                          <span>{split.name === userName ? "You" : split.name}</span>
+                          <span>{split.name === userName ? "Aš" : split.name}</span>
                           <span>{formatCurrency(split.amount, currency)}</span>
                         </div>
                       ))}
@@ -606,21 +566,22 @@ export default function NewTransactionPage() {
               </div>
             </StepContent>
           </CardContent>
+
           <CardFooter className="flex justify-between">
             {currentStep > 0 ? (
               <Button type="button" variant="outline" onClick={goToPreviousStep}>
                 <ChevronsLeft className="mr-2 h-4 w-4" />
-                Back
+                Atgal
               </Button>
             ) : (
               <Button type="button" variant="outline" onClick={() => router.push(`/groups/${groupId}`)}>
-                Cancel
+                Atšaukti
               </Button>
             )}
 
             {currentStep < steps.length - 1 ? (
               <Button type="submit" disabled={!canGoToNextStep()}>
-                Next
+                Toliau
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
@@ -637,7 +598,7 @@ export default function NewTransactionPage() {
                   !isDynamicValid()
                 }
               >
-                {isSubmitting ? "Adding..." : "Add Expense"}
+                {isSubmitting ? "Pridedama..." : "Pridėti išlaidą"}
                 <Check className="ml-2 h-4 w-4" />
               </Button>
             )}
@@ -656,3 +617,5 @@ function formatCurrency(amount: number, currencyCode = "EUR"): string {
     currency: currencyCode,
   }).format(amount)
 }
+
+                         
