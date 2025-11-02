@@ -6,7 +6,16 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PlusCircle, ArrowLeftCircle, UserPlus, Settings, MessageSquare, FileText, History } from "lucide-react"
+import {
+  PlusCircle,
+  ArrowLeftCircle,
+  UserPlus,
+  Settings,
+  MessageSquare,
+  DollarSign,
+  FileText,
+  History,
+} from "lucide-react"
 import type { Group } from "@/types/group"
 import type { Member } from "@/types/member"
 import type { Transaction } from "@/types/transaction"
@@ -17,9 +26,9 @@ import { GroupSettingsDialog } from "@/components/group-settings-dialog"
 import { GroupChat } from "@/components/group-chat"
 import { userApi, groupApi } from "@/services/api-client"
 import { useAuth } from "@/contexts/auth-context"
-import { mockGroupPermissions, mockUsers, mockCategories } from "@/lib/mock-data"
+import { mockGroupPermissions, mockUsers } from "@/lib/mock-data"
 import type { UserRole } from "@/types/user"
-import PaymentHistory from "@/components/payment-history"
+import PaymentHistory from "@/components/payment-history" // Added payment history import
 
 export default function GroupPage() {
   const params = useParams()
@@ -34,8 +43,6 @@ export default function GroupPage() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [userName, setUserName] = useState("")
-
-  const categories = mockCategories[groupId.toString()] || []
 
   const currentUserPermission = mockGroupPermissions.find(
     (p) => p.groupId === groupId.toString() && p.userId === user?.id,
@@ -134,32 +141,11 @@ export default function GroupPage() {
     }
   }
 
-  const handleEditTransaction = (updatedTransaction: Transaction) => {
-    // MOCK: Update transaction in state
-    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
-    // const response = await fetch('/api/transactions/update', {
-    //   method: 'PUT',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(updatedTransaction)
-    // })
-    // SQL Query:
-    // UPDATE transactions
-    // SET title = ?, amount = ?, paid_by = ?, split_type = ?,
-    //     currency = ?, category_id = ?, late_fee = ?, late_fee_days = ?, updated_at = NOW()
-    // WHERE id = ? AND group_id = ?
-
-    setTransactions((prev) => prev.map((t) => (t.id === updatedTransaction.id ? updatedTransaction : t)))
+  const handleEditTransaction = (transaction: Transaction) => {
+    console.log("Edit transaction:", transaction)
   }
 
   const handleDeleteTransaction = (transactionId: number) => {
-    // MOCK: Delete transaction from state
-    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
-    // const response = await fetch(`/api/transactions/${transactionId}`, {
-    //   method: 'DELETE'
-    // })
-    // SQL Query:
-    // DELETE FROM transactions WHERE id = ? AND group_id = ?
-
     setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
   }
 
@@ -277,12 +263,9 @@ export default function GroupPage() {
             <CardContent>
               <TransactionsList
                 transactions={transactions}
-                members={members}
-                categories={categories}
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
-                onDelete={handleDeleteTransaction}
-              />
+                onDelete={handleDeleteTransaction} members={[]} categories={[]}              />
             </CardContent>
           </Card>
         </TabsContent>
