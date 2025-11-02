@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/contexts/auth-context"
 import { Camera, Save, Lock } from "lucide-react"
+import { toast } from "sonner"
 
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, isLoading, updateProfile } = useAuth()
   const router = useRouter()
 
   const [name, setName] = useState(user?.name || "")
@@ -21,40 +22,47 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
+  // ✅ Redirect if not logged in
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [isLoading, user, router])
+
+  // ✅ Populate fields when user loads
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "")
+      setEmail(user.email || "")
+    }
+  }, [user])
+
+  if (isLoading) {
+    return <div className="text-center py-20 text-gray-500">Kraunama...</div>
+  }
+
   if (!user) {
-    router.push("/login")
     return null
   }
 
-  const handleUpdateProfile = () => {
-    // MOCK: Update profile
-    // REAL IMPLEMENTATION:
-    // const { error } = await supabase.auth.updateUser({
-    //   data: { name }
-    // })
-    // if (error) {
-    //   alert('Klaida atnaujinant profilį')
-    //   return
-    // }
-    alert("Profilis atnaujintas!")
+  // ✅ Save profile using AuthContext
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile({ name, email })
+      toast.success("Profilis atnaujintas")
+    } catch (error) {
+      toast.error("Nepavyko atnaujinti profilio")
+    }
   }
 
   const handleChangePassword = () => {
     if (newPassword !== confirmPassword) {
-      alert("Slaptažodžiai nesutampa")
+      toast.error("Slaptažodžiai nesutampa")
       return
     }
 
-    // MOCK: Change password
-    // REAL IMPLEMENTATION:
-    // const { error } = await supabase.auth.updateUser({
-    //   password: newPassword
-    // })
-    // if (error) {
-    //   alert('Klaida keičiant slaptažodį')
-    //   return
-    // }
-    alert("Slaptažodis pakeistas!")
+    // Mock change
+    toast.success("Slaptažodis pakeistas!")
     setCurrentPassword("")
     setNewPassword("")
     setConfirmPassword("")
@@ -78,6 +86,7 @@ export default function ProfilePage() {
           <TabsTrigger value="security">Saugumas</TabsTrigger>
         </TabsList>
 
+        {/* ---- Profile Tab ---- */}
         <TabsContent value="profile">
           <Card>
             <CardHeader>
@@ -113,7 +122,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <Button onClick={handleUpdateProfile}>
+                <Button onClick={handleSaveProfile}>
                   <Save className="h-4 w-4 mr-2" />
                   Išsaugoti pakeitimus
                 </Button>
@@ -122,6 +131,7 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
 
+        {/* ---- Security Tab ---- */}
         <TabsContent value="security">
           <Card>
             <CardHeader>

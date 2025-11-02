@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +13,7 @@ import { toast } from "sonner"
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { user, updateProfile } = useAuth()
-  const [name, setName] = useState(user?.name || "")
-  const [email, setEmail] = useState(user?.email || "")
+  const { user, isLoading } = useAuth()
 
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true)
@@ -25,18 +23,19 @@ export default function SettingsPage() {
   const [paymentReminders, setPaymentReminders] = useState(true)
   const [messages, setMessages] = useState(true)
 
-  if (!user) {
-    router.push("/login")
-    return null
+  // ✅ Redirect if not logged in
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [isLoading, user, router])
+
+  if (isLoading) {
+    return <div className="text-center py-20 text-gray-500">Kraunama...</div>
   }
 
-  const handleSaveProfile = async () => {
-    try {
-      await updateProfile({ name, email })
-      toast.success("Profilis atnaujintas")
-    } catch (error) {
-      toast.error("Nepavyko atnaujinti profilio")
-    }
+  if (!user) {
+    return null
   }
 
   const handleSaveNotifications = () => {
