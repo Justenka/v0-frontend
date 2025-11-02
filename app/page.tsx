@@ -1,5 +1,8 @@
 "use client"
 
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { PlusCircle } from "lucide-react"
 import GroupsList from "@/components/groups-list"
 import { useState, useEffect } from "react"
 import SetYourNameDialog from "@/components/set-name-dialog"
@@ -57,11 +60,19 @@ export default function HomePage() {
     )
   }
 
-  // 👇 Jei vartotojas prisijungęs — rodom tik grupių puslapį
+  // 👇 Jei vartotojas prisijungęs — rodom grupių puslapį su mygtuku
   return (
     <div className="container max-w-5xl py-10">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-semibold text-gray-900">Mano grupės</h2>
+
+        {/* Mygtukas matomas tik prisijungusiam vartotojui */}
+        <Link href="/groups/new">
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Sukurti grupę
+          </Button>
+        </Link>
       </div>
 
       <GroupsList yourName={displayName} />
