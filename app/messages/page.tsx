@@ -146,7 +146,9 @@ export default function MessagesPage() {
                           <>
                             <p className="text-sm text-gray-600 truncate">
                               {conv.lastMessage.senderId === user.id ? "Jūs: " : ""}
-                              {conv.lastMessage.content}
+                              {conv.lastMessage.content.length > 30
+                                ? conv.lastMessage.content.slice(0, 30) + "..."
+                                : conv.lastMessage.content}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
                               {formatDistanceToNow(conv.lastMessage.timestamp, { addSuffix: true, locale: lt })}

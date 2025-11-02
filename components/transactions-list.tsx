@@ -36,6 +36,7 @@ export default function TransactionsList({
   const [sortBy, setSortBy] = useState<string>("date-desc")
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  
 
   // Get unique payers for filter
   const uniquePayers = Array.from(new Set(transactions.map((t) => t.paidBy)))

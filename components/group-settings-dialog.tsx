@@ -215,7 +215,7 @@ export function GroupSettingsDialog({
                             value={member.role}
                             onValueChange={(value) => handleChangeRole(member.id, value as UserRole)}
                           >
-                            <SelectTrigger className="w-[140px]">
+                            <SelectTrigger className="w-[150px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
