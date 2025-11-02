@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,13 +24,24 @@ import { toast } from "sonner"
 
 export default function FriendsPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
 
+  useEffect(() => {
+    // Wait until loading finishes before deciding
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [isLoading, user, router])
+  
+  // Show a small loader or nothing while checking
+  if (isLoading) {
+    return <div className="text-center py-20 text-gray-500">Kraunama...</div>
+  }
+  
   if (!user) {
-    router.push("/login")
     return null
   }
 

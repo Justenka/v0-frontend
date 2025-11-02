@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,11 +25,30 @@ const notificationIcons = {
 
 export default function NotificationsPage() {
   const router = useRouter()
-  const { user } = useAuth()
-  const [notifications, setNotifications] = useState(mockNotifications.filter((n) => n.userId === user?.id))
+  const { user, isLoading } = useAuth()
+  const [notifications, setNotifications] = useState<typeof mockNotifications>([])
+
+    // 🔹 1. Redirect after auth check
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [isLoading, user, router])
+
+  // 🔹 2. Load user notifications
+  useEffect(() => {
+    if (user) {
+      const userNotifications = mockNotifications.filter((n) => n.userId === user.id)
+      setNotifications(userNotifications)
+    }
+  }, [user])
+
+  // 🧠 All hooks above — now we can safely conditionally render below
+  if (isLoading) {
+    return <div className="text-center py-20 text-gray-500">Kraunama...</div>
+  }
 
   if (!user) {
-    router.push("/login")
     return null
   }
 

@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,15 +19,26 @@ import { lt } from "date-fns/locale"
 
 export default function MessagesPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
 
-  if (!user) {
+  useEffect(() => {
+  // Wait until loading finishes before deciding
+  if (!isLoading && !user) {
     router.push("/login")
-    return null
   }
+}, [isLoading, user, router])
+
+// Show a small loader or nothing while checking
+if (isLoading) {
+  return <div className="text-center py-20 text-gray-500">Kraunama...</div>
+}
+
+if (!user) {
+  return null
+}
 
   // Get user's friends
   const friends = mockUsers.filter((u) => user.friends.includes(u.id))
