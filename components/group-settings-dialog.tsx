@@ -44,9 +44,6 @@ export function GroupSettingsDialog({
 }: GroupSettingsDialogProps) {
   const router = useRouter()
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<UserRole>("member")
-  const [inviteLink, setInviteLink] = useState("")
-  const [linkCopied, setLinkCopied] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -132,44 +129,6 @@ export function GroupSettingsDialog({
     */
   }
 
-  const handleGenerateInviteLink = () => {
-    // Mock: Generate invite link
-    const link = `${window.location.origin}/groups/${groupId}/join?token=${Math.random().toString(36).substring(7)}`
-    setInviteLink(link)
-    toast.success("Invite link generated!")
-
-    // Real implementation:
-    /*
-    // Generate unique invite token
-    const { data, error } = await supabase
-      .from('group_invites')
-      .insert({
-        group_id: groupId,
-        created_by: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        max_uses: 10
-      })
-      .select()
-      .single()
-
-    if (data) {
-      const link = `${window.location.origin}/groups/${groupId}/join?token=${data.token}`
-      setInviteLink(link)
-    }
-    */
-  }
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setLinkCopied(true)
-      toast.success("Link copied to clipboard!")
-      setTimeout(() => setLinkCopied(false), 2000)
-    } catch (err) {
-      toast.error("Failed to copy link")
-    }
-  }
-
   const getRoleBadgeVariant = (role: UserRole) => {
     switch (role) {
       case "admin":
@@ -230,10 +189,9 @@ export function GroupSettingsDialog({
           </DialogHeader>
 
           <Tabs defaultValue="members" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="members">Nariai ({members.length})</TabsTrigger>
-              <TabsTrigger value="invite">Pakviesti</TabsTrigger>
-              <TabsTrigger value="link">Kvietimo nuoroda</TabsTrigger>
+              <TabsTrigger value="danger" className="text-red-600">Pavojinga zona</TabsTrigger>
             </TabsList>
 
             <TabsContent value="members" className="space-y-4 mt-4">
@@ -300,103 +258,12 @@ export function GroupSettingsDialog({
                 </div>
               </div>
             </TabsContent>
-
-            <TabsContent value="invite" className="space-y-4 mt-4">
-              {canManageMembers ? (
-                <>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="invite-email">El. paštas</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        placeholder="vardas@pavyzdys.lt"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="invite-role">Rolė</Label>
-                      <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as UserRole)}>
-                        <SelectTrigger id="invite-role">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Administratorius</SelectItem>
-                          <SelectItem value="member">Narys</SelectItem>
-                          <SelectItem value="guest">Svečias</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button onClick={handleInviteMember} disabled={!inviteEmail} className="w-full">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Siųsti kvietimą
-                  </Button>
-                </>
-              ) : (
-                <div className="text-center py-8 text-gray-600">Tik administratoriai gali kviesti narius</div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="link" className="space-y-4 mt-4">
-              {canManageMembers ? (
-                <>
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <Link2 className="h-5 w-5 text-blue-600 mt-0.5" />
-                        <div className="text-sm">
-                          <p className="font-medium text-blue-900 mb-1">Kvietimo nuoroda</p>
-                          <p className="text-blue-800">
-                            Sukurkite kvietimo nuorodą, kurią galite dalintis su draugais. Bet kas su šia nuoroda galės
-                            prisijungti prie grupės.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!inviteLink ? (
-                      <Button onClick={handleGenerateInviteLink} className="w-full">
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Generuoti kvietimo nuorodą
-                      </Button>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label>Kvietimo nuoroda</Label>
-                          <div className="flex gap-2">
-                            <Input value={inviteLink} readOnly className="flex-1" />
-                            <Button onClick={handleCopyLink} variant="outline" size="icon">
-                              {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Ši nuoroda galioja 7 dienas ir gali būti panaudota iki 10 kartų.
-                        </p>
-                        <Button onClick={handleGenerateInviteLink} variant="outline" className="w-full bg-transparent">
-                          Generuoti naują nuorodą
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8 text-gray-600">
-                  Tik administratoriai gali generuoti kvietimo nuorodas
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          {canManageMembers && (
-            <div className="border-t pt-4 mt-4">
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-red-600">Pavojinga zona</h3>
-                <div className="flex items-start justify-between gap-4 p-4 border border-red-200 rounded-lg bg-red-50">
+            <TabsContent value="danger" className="space-y-4 mt-6">
+              <div className="p-5 border border-red-300 rounded-lg bg-red-50">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-red-900">Ištrinti grupę</p>
+                    <h3 className="text-lg font-semibold text-red-800">Ištrinti grupę</h3>
                     <p className="text-sm text-red-700 mt-1">
                       {deleteStatus.canDelete
                         ? "Šis veiksmas negrįžtamas. Visi duomenys bus prarasti."
@@ -405,7 +272,6 @@ export function GroupSettingsDialog({
                   </div>
                   <Button
                     variant="destructive"
-                    size="sm"
                     onClick={() => setShowDeleteDialog(true)}
                     disabled={!deleteStatus.canDelete}
                   >
@@ -414,8 +280,8 @@ export function GroupSettingsDialog({
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
