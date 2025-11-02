@@ -6,16 +6,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  PlusCircle,
-  ArrowLeftCircle,
-  UserPlus,
-  Settings,
-  MessageSquare,
-  DollarSign,
-  FileText,
-  History,
-} from "lucide-react"
+import { PlusCircle, ArrowLeftCircle, UserPlus, Settings, MessageSquare, FileText, History } from "lucide-react"
 import type { Group } from "@/types/group"
 import type { Member } from "@/types/member"
 import type { Transaction } from "@/types/transaction"
@@ -23,13 +14,12 @@ import MembersList from "@/components/members-list"
 import TransactionsList from "@/components/transactions-list"
 import AddMemberDialog from "@/components/add-member-dialog"
 import { GroupSettingsDialog } from "@/components/group-settings-dialog"
-import { RegisterPaymentDialog } from "@/components/register-payment-dialog"
 import { GroupChat } from "@/components/group-chat"
 import { userApi, groupApi } from "@/services/api-client"
 import { useAuth } from "@/contexts/auth-context"
-import { mockGroupPermissions, mockUsers } from "@/lib/mock-data"
+import { mockGroupPermissions, mockUsers, mockCategories } from "@/lib/mock-data"
 import type { UserRole } from "@/types/user"
-import PaymentHistory from "@/components/payment-history" // Added payment history import
+import PaymentHistory from "@/components/payment-history"
 
 export default function GroupPage() {
   const params = useParams()
@@ -43,8 +33,9 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  // const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [userName, setUserName] = useState("")
+
+  const categories = mockCategories[groupId.toString()] || []
 
   const currentUserPermission = mockGroupPermissions.find(
     (p) => p.groupId === groupId.toString() && p.userId === user?.id,
@@ -143,27 +134,32 @@ export default function GroupPage() {
     }
   }
 
-  const handleRegisterPayment = (fromMember: string, toMember: string, amount: number, note?: string) => {
-    console.log(`Payment registered: ${fromMember} → ${toMember}: ${amount}`, note)
+  const handleEditTransaction = (updatedTransaction: Transaction) => {
+    // MOCK: Update transaction in state
+    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
+    // const response = await fetch('/api/transactions/update', {
+    //   method: 'PUT',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify(updatedTransaction)
+    // })
+    // SQL Query:
+    // UPDATE transactions
+    // SET title = ?, amount = ?, paid_by = ?, split_type = ?,
+    //     currency = ?, category_id = ?, late_fee = ?, late_fee_days = ?, updated_at = NOW()
+    // WHERE id = ? AND group_id = ?
 
-    setMembers((prev) =>
-      prev.map((member) => {
-        if (member.name === fromMember) {
-          return { ...member, balance: member.balance + amount }
-        }
-        if (member.name === toMember) {
-          return { ...member, balance: member.balance - amount }
-        }
-        return member
-      }),
-    )
-  }
-
-  const handleEditTransaction = (transaction: Transaction) => {
-    console.log("Edit transaction:", transaction)
+    setTransactions((prev) => prev.map((t) => (t.id === updatedTransaction.id ? updatedTransaction : t)))
   }
 
   const handleDeleteTransaction = (transactionId: number) => {
+    // MOCK: Delete transaction from state
+    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
+    // const response = await fetch(`/api/transactions/${transactionId}`, {
+    //   method: 'DELETE'
+    // })
+    // SQL Query:
+    // DELETE FROM transactions WHERE id = ? AND group_id = ?
+
     setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
   }
 
@@ -221,12 +217,6 @@ export default function GroupPage() {
                 </Button>
               </Link>
             )}
-            {/* {userRole !== "guest" && (
-              <Button variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                Registruoti mokėjimą
-              </Button>
-            )} */}
             <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Nustatymai
@@ -287,6 +277,8 @@ export default function GroupPage() {
             <CardContent>
               <TransactionsList
                 transactions={transactions}
+                members={members}
+                categories={categories}
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
                 onDelete={handleDeleteTransaction}
@@ -322,13 +314,6 @@ export default function GroupPage() {
         members={groupMembers}
         currentUserRole={userRole}
       />
-
-      {/* <RegisterPaymentDialog
-        open={isPaymentDialogOpen}
-        onOpenChange={setIsPaymentDialogOpen}
-        members={members}
-        onRegisterPayment={handleRegisterPayment}
-      /> */}
     </div>
   )
 }

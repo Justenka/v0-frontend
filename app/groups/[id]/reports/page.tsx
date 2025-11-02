@@ -55,29 +55,22 @@ export default async function GroupReportsPage({ params }: { params: Promise<{ i
     {} as Record<string, { total: number; count: number }>,
   )
 
-  // Calculate category breakdown
-  const categoryData = transactions.reduce(
-    (acc, t) => {
-      if (!acc[t.title]) {
-        acc[t.title] = { total: 0, count: 0 }
-      }
-      acc[t.title].total += t.amount
-      acc[t.title].count += 1
-      return acc
-    },
-    {} as Record<string, { total: number; count: number }>,
-  )
-
   const handleExport = (format: "csv" | "pdf") => {
     // MOCK: Export functionality
-    // REAL IMPLEMENTATION:
-    // if (format === 'csv') {
-    //   const csv = generateCSV(transactions, memberStats)
-    //   downloadFile(csv, `${group.title}-report.csv`, 'text/csv')
-    // } else {
-    //   const pdf = await generatePDF(transactions, memberStats, monthlyData)
-    //   downloadFile(pdf, `${group.title}-report.pdf`, 'application/pdf')
-    // }
+    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
+    // const response = await fetch(`/api/groups/${groupId}/reports/export?format=${format}`)
+    // const blob = await response.blob()
+    // const url = window.URL.createObjectURL(blob)
+    // const a = document.createElement('a')
+    // a.href = url
+    // a.download = `${group.title}-report.${format}`
+    // a.click()
+    // SQL Query for data:
+    // SELECT t.*, m.name as member_name
+    // FROM transactions t
+    // JOIN members m ON t.paid_by = m.id
+    // WHERE t.group_id = ?
+    // ORDER BY t.date DESC
     alert(`Eksportuojama ${format.toUpperCase()} ataskaita...`)
   }
 
@@ -151,7 +144,6 @@ export default async function GroupReportsPage({ params }: { params: Promise<{ i
         <TabsList>
           <TabsTrigger value="members">Nariai</TabsTrigger>
           <TabsTrigger value="monthly">Mėnesinis</TabsTrigger>
-          <TabsTrigger value="categories">Kategorijos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="space-y-4">
@@ -211,35 +203,6 @@ export default async function GroupReportsPage({ params }: { params: Promise<{ i
                     </div>
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Kategorijų suvestinė</CardTitle>
-              <CardDescription>Išlaidų pasiskirstymas pagal kategorijas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(categoryData)
-                  .sort(([, a], [, b]) => b.total - a.total)
-                  .map(([category, data]) => (
-                    <div key={category} className="flex items-center justify-between border-b pb-4 last:border-0">
-                      <div className="space-y-1">
-                        <p className="font-medium">{category}</p>
-                        <p className="text-sm text-muted-foreground">{data.count} operacijos</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">{data.total.toFixed(2)} €</p>
-                        <p className="text-sm text-muted-foreground">
-                          {((data.total / totalExpenses) * 100).toFixed(1)}% viso
-                        </p>
-                      </div>
-                    </div>
-                  ))}
               </div>
             </CardContent>
           </Card>

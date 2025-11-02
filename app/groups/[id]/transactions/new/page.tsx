@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import toast from "react-hot-toast" // Import toast for notifications
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -37,6 +38,10 @@ export default function NewTransactionPage() {
   const [lateFeeAmount, setLateFeeAmount] = useState("")
   const [lateFeeDays, setLateFeeDays] = useState("7")
   const [isCurrencyConverterOpen, setIsCurrencyConverterOpen] = useState(false)
+  const [categoryId, setCategoryId] = useState("")
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
 
   // Stepper state
   const [currentStep, setCurrentStep] = useState(0)
@@ -70,6 +75,31 @@ export default function NewTransactionPage() {
     }
 
     if (groupId) fetchMembers()
+  }, [groupId])
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        // MOCK: Fetch categories from mock data
+        // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
+        // const response = await fetch(`/api/groups/${groupId}/categories`)
+        // const data = await response.json()
+        // SQL Query:
+        // SELECT id, name FROM categories WHERE group_id = ? ORDER BY name ASC
+
+        const mockCategories = [
+          { id: "c1", name: "Maistas" },
+          { id: "c2", name: "Transportas" },
+          { id: "c3", name: "Pramogos" },
+          { id: "c4", name: "Būstas" },
+        ]
+        setCategories(mockCategories)
+      } catch (error) {
+        console.error("Failed to fetch categories:", error)
+      }
+    }
+
+    if (groupId) fetchCategories()
   }, [groupId])
 
   const [percentages, setPercentages] = useState<Record<number, string>>({})
@@ -141,7 +171,7 @@ export default function NewTransactionPage() {
         splitTypeDescription = "Custom amounts"
       }
 
-      await groupApi.addTransaction(groupId, title, Number.parseFloat(amount), paidBy, splitTypeDescription)
+      await groupApi.addTransaction(groupId, title, Number.parseFloat(amount), paidBy, splitTypeDescription, categoryId)
 
       router.push(`/groups/${groupId}`)
     } catch (error) {
@@ -175,6 +205,35 @@ export default function NewTransactionPage() {
     if (splitType !== "dynamic") return true
     const totalSplit = Object.values(amounts).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
     return Math.abs(totalSplit - Number.parseFloat(amount || "0")) < 0.01
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+
+    // MOCK: Create new category
+    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
+    // const response = await fetch('/api/categories/create', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     groupId,
+    //     name: newCategoryName,
+    //     createdBy: userId
+    //   })
+    // })
+    // SQL Query:
+    // INSERT INTO categories (id, name, group_id, created_by, created_at)
+    // VALUES (UUID(), ?, ?, ?, NOW())
+
+    const newCategory = {
+      id: `c${Date.now()}`,
+      name: newCategoryName,
+    }
+    setCategories([...categories, newCategory])
+    setCategoryId(newCategory.id)
+    setNewCategoryName("")
+    setIsCreatingCategory(false)
+    toast.success("Kategorija sukurta") // Use toast to show success message
   }
 
   // Calculate split amounts for display in review step
@@ -330,6 +389,56 @@ export default function NewTransactionPage() {
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategorija</Label>
+                  {!isCreatingCategory ? (
+                    <div className="flex gap-2">
+                      <Select value={categoryId} onValueChange={setCategoryId}>
+                        <SelectTrigger id="category" className="flex-1">
+                          <SelectValue placeholder="Pasirinkite kategoriją" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" onClick={() => setIsCreatingCategory(true)}>
+                        Nauja
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Kategorijos pavadinimas"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            handleCreateCategory()
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={handleCreateCategory} disabled={!newCategoryName.trim()}>
+                        Sukurti
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCreatingCategory(false)
+                          setNewCategoryName("")
+                        }}
+                      >
+                        Atšaukti
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </StepContent>
 
@@ -478,6 +587,10 @@ export default function NewTransactionPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Split method</p>
                       <p className="font-medium capitalize">{splitType}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Category</p>
+                      <p className="font-medium">{categories.find((cat) => cat.id === categoryId)?.name || "N/A"}</p>
                     </div>
                   </div>
 
