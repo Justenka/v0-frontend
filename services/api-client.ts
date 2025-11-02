@@ -8,6 +8,7 @@ import {
   removeMemberFromGroup,
   addTransaction,
   settleUp,
+  deleteMockGroup,
 } from "@/lib/mock-data"
 
 // Simulate network delay for more realistic behavior
@@ -83,5 +84,13 @@ export const groupApi = {
     const success = settleUp(groupId, memberId)
     if (!success) throw new Error("Failed to settle up")
     return getGroupById(groupId)
+  },
+
+  // Delete a group
+  deleteGroup: async (groupId: number) => {
+    await delay()
+    const success = deleteMockGroup(groupId)
+    if (!success) throw new Error("Failed to delete group")
+    return true
   },
 }

@@ -772,3 +772,30 @@ export const settleUp = (groupId: number, memberId: number): boolean => {
   member.balance = 0
   return true
 }
+
+// Helper function to delete a group
+export const deleteMockGroup = (groupId: number): boolean => {
+  const groupIndex = mockGroups.findIndex((g) => g.id === groupId)
+  if (groupIndex === -1) return false
+
+  // Remove the group
+  mockGroups.splice(groupIndex, 1)
+
+  // Remove associated data
+  delete mockTransactions[groupId]
+  delete mockCategories[String(groupId)]
+  delete mockGroupMessages[String(groupId)]
+  delete mockPayments[groupId]
+
+  // Remove group permissions
+  const permissionIndices = mockGroupPermissions
+    .map((p, i) => (p.groupId === String(groupId) ? i : -1))
+    .filter((i) => i !== -1)
+  permissionIndices.reverse().forEach((i) => mockGroupPermissions.splice(i, 1))
+
+  // Remove activities
+  const activityIndices = mockActivities.map((a, i) => (a.groupId === String(groupId) ? i : -1)).filter((i) => i !== -1)
+  activityIndices.reverse().forEach((i) => mockActivities.splice(i, 1))
+
+  return true
+}
