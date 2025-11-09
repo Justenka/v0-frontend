@@ -58,7 +58,7 @@ export function EditTransactionDialog({
       setLateFeeAmount(transaction.lateFee?.toString() || "")
       setLateFeeDays(transaction.lateFeeDays?.toString() || "7")
     }
-  }, [transaction])
+  }, [transaction, members])
 
   const handleSave = () => {
     if (!transaction) return

@@ -61,17 +61,17 @@ export default function SettleUpDialog({ open, onOpenChange, member, onSettleUp 
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Settle Up with {member.name}</DialogTitle>
+            <DialogTitle>Gražinti {member.name}</DialogTitle>
             <DialogDescription>
               {member.balance > 0
-                ? `${member.name} owes you ${formatCurrency(member.balance)}`
-                : `You owe ${member.name} ${formatCurrency(Math.abs(member.balance))}`}
+                ? `${member.name} jums skolingas ${formatCurrency(member.balance)}`
+                : `Jūs skolingas ${member.name} ${formatCurrency(Math.abs(member.balance))}`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">
-                Amount
+                Suma
               </Label>
               <div className="col-span-3">
                 <Input
@@ -83,16 +83,16 @@ export default function SettleUpDialog({ open, onOpenChange, member, onSettleUp 
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="col-span-3"
-                  placeholder={`Enter amount (max: ${formatCurrency(maxAmount)})`}
+                  placeholder={`Įveskite suma`}
                   required
                 />
-                <p className="text-xs text-muted-foreground mt-1">Enter an amount up to {formatCurrency(maxAmount)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Įveskite sumą iki {formatCurrency(maxAmount)}</p>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Atšaukti
             </Button>
             <Button
               type="submit"
@@ -103,7 +103,7 @@ export default function SettleUpDialog({ open, onOpenChange, member, onSettleUp 
                 Number.parseFloat(amount) > maxAmount
               }
             >
-              {isSubmitting ? "Processing..." : "Settle Up"}
+              {isSubmitting ? "Kraunama..." : "Gražinti"}
             </Button>
           </DialogFooter>
         </form>

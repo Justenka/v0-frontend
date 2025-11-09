@@ -91,23 +91,19 @@ export const mockGroupPermissions: GroupPermission[] = [
   { groupId: "3", userId: "7", role: "member" },
 ]
 
-export const mockCategories: Record<string, Category[]> = {
-  "1": [
-    { id: "c1", name: "Accommodation", groupId: "1", createdBy: "1", createdAt: new Date("2025-01-14") },
-    { id: "c2", name: "Food & Dining", groupId: "1", createdBy: "1", createdAt: new Date("2025-01-14") },
-    { id: "c3", name: "Transportation", groupId: "1", createdBy: "1", createdAt: new Date("2025-01-14") },
-    { id: "c4", name: "Entertainment", groupId: "1", createdBy: "2", createdAt: new Date("2025-01-15") },
-  ],
-  "2": [
-    { id: "c5", name: "Rent", groupId: "2", createdBy: "4", createdAt: new Date("2024-12-01") },
-    { id: "c6", name: "Utilities", groupId: "2", createdBy: "4", createdAt: new Date("2024-12-01") },
-    { id: "c7", name: "Groceries", groupId: "2", createdBy: "1", createdAt: new Date("2024-12-05") },
-  ],
-  "3": [
-    { id: "c8", name: "Lunch", groupId: "3", createdBy: "1", createdAt: new Date("2025-01-20") },
-    { id: "c9", name: "Coffee", groupId: "3", createdBy: "5", createdAt: new Date("2025-01-21") },
-  ],
-}
+export const mockCategories = [
+  { id: "c0",  name: "Kita" },
+  { id: "c1",  name: "Apgyvendinimas" },
+  { id: "c2",  name: "Maistas ir valgymas" },
+  { id: "c3",  name: "Transportas" },
+  { id: "c4",  name: "Pramogos" },
+  { id: "c5",  name: "Komunalinės paslaugos" },
+  { id: "c6",  name: "Ryšiai ir internetas" },
+  { id: "c7",  name: "Drabužiai ir avalynė" },
+  { id: "c8",  name: "Sveikata ir vaistai" },
+  { id: "c9",  name: "Namų ūkis ir buitis" },
+  { id: "c10", name: "Kelionės ir poilsis" },
+]
 
 export const mockPayments: Record<number, Payment[]> = {
   1: [
@@ -688,7 +684,7 @@ export const addMockGroup = (title: string, creatorId = "1"): Group => {
 
   mockGroups.push(newGroup)
   mockTransactions[newGroup.id] = []
-  mockCategories[String(newGroup.id)] = []
+  mockTransactions[newGroup.id] = []
   mockGroupMessages[String(newGroup.id)] = []
 
   nextGroupId++
@@ -783,7 +779,6 @@ export const deleteMockGroup = (groupId: number): boolean => {
 
   // Remove associated data
   delete mockTransactions[groupId]
-  delete mockCategories[String(groupId)]
   delete mockGroupMessages[String(groupId)]
   delete mockPayments[groupId]
 

@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeftCircle, ArrowRight, Check, ChevronsLeft, DollarSign } from "lucide-react"
 import type { Member } from "@/types/member"
+import type { Category } from "@/types/category"
 import { userApi, groupApi } from "@/services/api-client"
 import { Stepper, StepContent } from "@/components/ui/stepper"
 import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
@@ -39,10 +40,8 @@ export default function NaujaIslaidaPuslapis() {
   const [lateFeeAmount, setLateFeeAmount] = useState("")
   const [lateFeeDays, setLateFeeDays] = useState("7")
   const [isCurrencyConverterOpen, setIsCurrencyConverterOpen] = useState(false)
-  const [categoryId, setCategoryId] = useState("")
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false)
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
+  const [categoryId, setCategoryId] = useState<string>("")
+  const [categories, setCategories] = useState<Category[]>([])
 
   const [currentStep, setCurrentStep] = useState(0)
   const steps = ["Duomenys", "Kas mokėjo", "Dalinimas", "Peržiūra"]
@@ -64,13 +63,11 @@ export default function NaujaIslaidaPuslapis() {
 
   useEffect(() => {
     try {
-      const groupKey = String(groupId)
-      const groupCategories = mockCategories[groupKey] || []
-      setCategories(groupCategories)
+      setCategories(mockCategories)
     } catch (error) {
       console.error("Nepavyko įkelti kategorijų:", error)
     }
-  }, [groupId])
+  }, [])
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -158,20 +155,6 @@ export default function NaujaIslaidaPuslapis() {
       toast.error("Nepavyko pridėti išlaidos.")
       setIsSubmitting(false)
     }
-  }
-
-  const handleCreateCategory = () => {
-    if (!newCategoryName.trim()) return
-
-    const newCategory = {
-      id: `c${Date.now()}`,
-      name: newCategoryName,
-    }
-    setCategories([...categories, newCategory])
-    setCategoryId(newCategory.id)
-    setNewCategoryName("")
-    setIsCreatingCategory(false)
-    toast.success("Kategorija sukurta")
   }
 
   const handlePercentageChange = (memberId: number, value: string) => {
@@ -343,52 +326,20 @@ const isDynamicValid = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="category">Kategorija</Label>
-                  {!isCreatingCategory ? (
-                    <div className="flex gap-2">
-                      <Select value={categoryId} onValueChange={setCategoryId}>
-                        <SelectTrigger id="category" className="flex-1">
-                          <SelectValue placeholder="Pasirinkite kategoriją" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button type="button" variant="outline" onClick={() => setIsCreatingCategory(true)}>
-                        Nauja
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Kategorijos pavadinimas"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault()
-                            handleCreateCategory()
-                          }
-                        }}
-                      />
-                      <Button type="button" onClick={handleCreateCategory} disabled={!newCategoryName.trim()}>
-                        Sukurti
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsCreatingCategory(false)
-                          setNewCategoryName("")
-                        }}
-                      >
-                        Atšaukti
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    <Select value={categoryId} onValueChange={setCategoryId}>
+                      <SelectTrigger id="category" className="flex-1">
+                        <SelectValue placeholder="Pasirinkite kategoriją" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </StepContent>
@@ -617,5 +568,3 @@ function formatCurrency(amount: number, currencyCode = "EUR"): string {
     currency: currencyCode,
   }).format(amount)
 }
-
-                         

@@ -36,7 +36,7 @@ export default function GroupPage() {
   const router = useRouter()
   const { user } = useAuth()
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
-  const categories = mockCategories[groupId] || []
+  const categories = mockCategories
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -165,11 +165,11 @@ export default function GroupPage() {
   if (!group) {
     return (
       <div className="container max-w-4xl py-10 text-center">
-        <h2 className="text-2xl font-bold mb-4">Group not found</h2>
+        <h2 className="text-2xl font-bold mb-4">Grupių nerasta</h2>
         <Link href="/">
           <Button>
             <ArrowLeftCircle className="mr-2 h-4 w-4" />
-            Back to Groups
+            Atgal į grupes
           </Button>
         </Link>
       </div>
@@ -267,7 +267,8 @@ export default function GroupPage() {
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
                 categories={categories}
-                onDelete={handleDeleteTransaction} members={[]}/>
+                onDelete={handleDeleteTransaction} 
+                members={members}/>
             </CardContent>
           </Card>
         </TabsContent>

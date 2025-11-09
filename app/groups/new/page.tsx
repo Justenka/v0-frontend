@@ -51,24 +51,24 @@ export default function NewGroupPage() {
     <div className="container max-w-md py-10 mx-auto px-4">
       <Link href="/" className="text-muted-foreground hover:text-foreground inline-flex items-center mb-6">
         <ArrowLeftCircle className="mr-2 h-4 w-4" />
-        Back to Groups
+        Atgal į grupes
       </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create a New Group</CardTitle>
+          <CardTitle>Sukurkite naują grupę</CardTitle>
           <CardDescription>
-            Create a group to start tracking expenses with friends, roommates, or colleagues.
+            Sukurkite grupę, kad galėtumėte pradėti stebėti išlaidas su draugais, kambariokais ar kolegomis.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent>
             <div className="grid w-full items-center gap-4">
               <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="title">Group Name</Label>
+                <Label htmlFor="title">Grupės pavadinimas</Label>
                 <Input
                   id="title"
-                  placeholder="e.g., Roommates, Trip to Paris, Office Lunch"
+                  placeholder="pvz., Kambariokai, Kelionė į Paryžių, Pietūs biure"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
@@ -78,10 +78,10 @@ export default function NewGroupPage() {
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" type="button" onClick={() => router.push("/")} disabled={isSubmitting}>
-              Cancel
+              Atšaukti
             </Button>
             <Button type="submit" disabled={isSubmitting || !title.trim() || !user}>
-              {isSubmitting ? "Creating..." : "Create Group"}
+              {isSubmitting ? "Kuriama..." : "Sukurti grupę"}
             </Button>
           </CardFooter>
         </form>
