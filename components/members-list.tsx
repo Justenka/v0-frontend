@@ -63,7 +63,7 @@ export default function MembersList({ members, onSettleUp, onRemoveMember }: Mem
                   )}
                 </p>
               )}
-              {member.balance === 0 && <p className="text-sm text-muted-foreground">Settled up</p>}
+              {member.balance === 0 && <p className="text-sm text-muted-foreground">Atsiskaityta</p>}
             </div>
 
             <div className="flex items-center gap-2">

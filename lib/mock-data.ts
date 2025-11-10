@@ -619,7 +619,7 @@ export const mockTransactions: Record<number, Transaction[]> = {
       amount: 64.0,
       paidBy: "Alex",
       date: new Date("2025-01-24"),
-      splitType: "Equally among 3 people",
+      splitType: "Lygiomis dalimis",
       categoryId: "c8",
     },
     {
@@ -628,7 +628,7 @@ export const mockTransactions: Record<number, Transaction[]> = {
       amount: 32.0,
       paidBy: "Alex",
       date: new Date("2025-01-25"),
-      splitType: "Equally among 3 people",
+      splitType: "Lygiomis dalimis",
       categoryId: "c8",
     },
   ],
