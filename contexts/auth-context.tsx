@@ -4,7 +4,8 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
 import { mockUsers } from "@/lib/mock-data"
-import { authApi, BackendUser } from "@/services/api-client"
+import { authApi} from "@/services/api-client"
+import type { BackendUser } from "@/types/backend"
 
 interface AuthContextType {
   user: AuthUser | null

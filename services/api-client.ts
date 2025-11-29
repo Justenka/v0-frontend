@@ -4,7 +4,6 @@ import {
   setMockUserName,
   mockGroups,
   getGroupById,
-  addMockGroup,
   addMemberToGroup,
   removeMemberFromGroup,
   addTransaction,
@@ -12,23 +11,15 @@ import {
   deleteMockGroup,
 } from "@/lib/mock-data"
 
+import type {
+  BackendUser,
+  BackendGroupForUser,
+  LoginResponse,
+} from "@/types/backend"
+
 // ---- NEW: backend API URL + tipai ----
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-
-export interface BackendUser {
-  id_vartotojas: number
-  vardas: string
-  pavarde: string
-  el_pastas: string
-  valiutos_kodas: number
-  sukurimo_data: Date
-  paskutinis_prisijungimas: string
-}
-
-export interface LoginResponse {
-  user: BackendUser
-}
 
 // Simulate network delay for more realistic behavior (tik mockams)
 const delay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -87,9 +78,45 @@ export const groupApi = {
   },
 
   // Create a new group
-  createGroup: async (title: string, userId: string) => {
-    await delay()
-    return addMockGroup(title, userId)
+  createGroupBackend: async (
+  title: string,
+  ownerId: number,
+  description?: string,
+): Promise<BackendGroupForUser> => {
+  const res = await fetch(`${API_URL}/api/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      description,
+      ownerId,
+    }),
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    const message = data?.message || "Nepavyko sukurti grupės"
+    throw new Error(message)
+  }
+
+  return data as BackendGroupForUser
+},
+
+// grupės, kuriose prisijungęs useris yra narys (iš DB)
+  getUserGroupsBackend: async (
+    userId: number,
+  ): Promise<BackendGroupForUser[]> => {
+    const res = await fetch(`${API_URL}/api/groups-by-user/${userId}`)
+
+    const data = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      const message = data?.message || "Nepavyko gauti grupių sąrašo"
+      throw new Error(message)
+    }
+
+    return data as BackendGroupForUser[]
   },
 
   // Add a member to a group

@@ -27,7 +27,7 @@ export default function LoginPage() {
 
     try {
     await login(email, password)   // jei blogi duomenys -> throw Error
-    router.push("/groups")         // VYKDOM TIK jei login pavyko
+    router.push("/")         // VYKDOM TIK jei login pavyko
   } catch (err: any) {
     setError(err.message || "Prisijungti nepavyko")
   } finally {

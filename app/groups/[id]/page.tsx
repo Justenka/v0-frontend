@@ -12,7 +12,6 @@ import {
   UserPlus,
   Settings,
   MessageSquare,
-  DollarSign,
   FileText,
   History,
 } from "lucide-react"
@@ -24,27 +23,29 @@ import TransactionsList from "@/components/transactions-list"
 import AddMemberDialog from "@/components/add-member-dialog"
 import { GroupSettingsDialog } from "@/components/group-settings-dialog"
 import { GroupChat } from "@/components/group-chat"
-import { userApi, groupApi } from "@/services/api-client"
+import { groupApi } from "@/services/api-client"
 import { useAuth } from "@/contexts/auth-context"
-import { mockGroupPermissions, mockUsers } from "@/lib/mock-data"
+import { mockGroupPermissions, mockUsers, mockCategories } from "@/lib/mock-data"
 import type { UserRole } from "@/types/user"
 import PaymentHistory from "@/components/payment-history"
-import { mockCategories } from "@/lib/mock-data"
+import type { BackendGroupForUser } from "@/types/backend"
 
 export default function GroupPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
   const categories = mockCategories
+
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [userName, setUserName] = useState("")
 
+  // ROLE kol kas dar iš mockGroupPermissions
   const currentUserPermission = mockGroupPermissions.find(
     (p) => p.groupId === groupId.toString() && p.userId === user?.id,
   )
@@ -52,7 +53,9 @@ export default function GroupPage() {
 
   const groupMembers = members.map((member) => {
     const memberUser = mockUsers.find((u) => u.name === member.name)
-    const permission = mockGroupPermissions.find((p) => p.groupId === groupId.toString() && p.userId === memberUser?.id)
+    const permission = mockGroupPermissions.find(
+      (p) => p.groupId === groupId.toString() && p.userId === memberUser?.id,
+    )
     return {
       id: memberUser?.id || member.id.toString(),
       name: member.name,
@@ -61,26 +64,59 @@ export default function GroupPage() {
     }
   })
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchData = async () => {
       try {
-        const name = await userApi.getUserName()
-        setUserName(name)
-
-        if (!name && !user) {
-          alert("Please set your name first")
-          router.push("/")
+        if (!groupId || Number.isNaN(groupId)) {
+          console.error("Group id is invalid")
+          setLoading(false)
           return
         }
 
-        const groupData = await groupApi.getGroup(groupId)
-        if (!groupData) throw new Error("Group not found")
+        if (!user) {
+          // jei vartotojas neprisijungęs – metam į login
+          router.push("/login")
+          setLoading(false)
+          return
+        }
+
+        const userId = Number(user.id)
+        const backendGroups: BackendGroupForUser[] = await groupApi.getUserGroupsBackend(userId)
+
+        const backendGroup = backendGroups.find((g) => g.id_grupe === groupId)
+        if (!backendGroup) {
+          console.error("Group not found in backend")
+          setGroup(null)
+          setLoading(false)
+          return
+        }
+
+        // Mapinam į Group tipą, kad likęs UI veiktų
+        const groupData: Group = {
+          id: backendGroup.id_grupe, // number
+          title: backendGroup.pavadinimas,
+          description: backendGroup.aprasas ?? null,
+          createdAt: backendGroup.sukurimo_data,
+
+          ownerId: undefined, // jei SELECT'e neturi fk_id_vartotojas, paliekam kol kas
+          ownerFirstName: backendGroup.owner_vardas,
+          ownerLastName: backendGroup.owner_pavarde,
+
+          role: backendGroup.role,
+          memberStatus: backendGroup.nario_busena,
+
+          // frontend logika – kol kas tuščia, kol neprijungsim realių narių / skolų iš DB
+          members: [],
+          transactions: [],
+          balance: 0,
+        }
 
         setGroup(groupData)
         setMembers(groupData.members || [])
-        setTransactions((groupData as any).transactions || [])
+        setTransactions(groupData.transactions || [])
       } catch (error) {
         console.error("Failed to load data:", error)
+        setGroup(null)
       } finally {
         setLoading(false)
       }
@@ -165,7 +201,7 @@ export default function GroupPage() {
   if (!group) {
     return (
       <div className="container max-w-4xl py-10 text-center">
-        <h2 className="text-2xl font-bold mb-4">Grupių nerasta</h2>
+        <h2 className="text-2xl font-bold mb-4">Grupė nerasta</h2>
         <Link href="/">
           <Button>
             <ArrowLeftCircle className="mr-2 h-4 w-4" />
@@ -267,8 +303,9 @@ export default function GroupPage() {
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
                 categories={categories}
-                onDelete={handleDeleteTransaction} 
-                members={members}/>
+                onDelete={handleDeleteTransaction}
+                members={members}
+              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -2,25 +2,40 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { Group } from "@/types/group"
-import { groupApi } from "@/services/api-client"
 
-interface GroupsListProps {
-  yourName: string
+import { groupApi } from "@/services/api-client"
+import { useAuth } from "@/contexts/auth-context"
+import type { BackendGroupForUser } from "@/types/backend"
+
+// Prasiplečiam backend grupės tipą su optional members,
+// kad sena balansų logika galėtų likti.
+type GroupWithMembers = BackendGroupForUser & {
+  members?: { name: string; balance: number }[]
 }
 
-export default function GroupsList({ yourName }: GroupsListProps) {
-  const [groups, setGroups] = useState<Group[]>([])
+export default function GroupsList() {
+  const { user, isLoading: authLoading } = useAuth()
+  const [groups, setGroups] = useState<GroupWithMembers[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const data = await groupApi.getAllGroups()
-        setGroups(data)
+        if (!user) {
+          setGroups([])
+          return
+        }
+
+        const userId = Number(user.id)
+        const data = await groupApi.getUserGroupsBackend(userId)
+
+        // kol kas backend nesiunčia members/balanso,
+        // bet tipas leidžia juos turėti ateityje
+        setGroups(data as GroupWithMembers[])
       } catch (err) {
         console.error("Failed to load groups:", err)
       } finally {
@@ -28,29 +43,36 @@ export default function GroupsList({ yourName }: GroupsListProps) {
       }
     }
 
-    if (yourName) {
-      fetchGroups()
-    } else {
-      setLoading(false)
+    if (!authLoading) {
+      if (user) {
+        fetchGroups()
+      } else {
+        setLoading(false)
+      }
     }
-  }, [yourName])
+  }, [user, authLoading])
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
           <Card key={i}>
-            <CardContent className="p-4">Loading...</CardContent>
+            <CardContent className="p-4">Kraunama...</CardContent>
           </Card>
         ))}
       </div>
     )
   }
 
-  if (!yourName) {
+  if (!user) {
     return (
       <div className="text-center py-10">
-        <p className="text-muted-foreground mb-4">Please set your name to view your groups</p>
+        <p className="text-muted-foreground mb-4">
+          Norėdami matyti savo grupes, prisijunkite.
+        </p>
+        <Link href="/login">
+          <Button>Prisijungti</Button>
+        </Link>
       </div>
     )
   }
@@ -58,13 +80,17 @@ export default function GroupsList({ yourName }: GroupsListProps) {
   if (groups.length === 0) {
     return (
       <div className="text-center py-10">
-        <p className="text-muted-foreground mb-4">You don't have any groups yet</p>
+        <p className="text-muted-foreground mb-4">
+          Šiuo metu neturite jokių grupių.
+        </p>
         <Link href="/groups/new">
-          <Button>Create your first group</Button>
+          <Button>Sukurti pirmą grupę</Button>
         </Link>
       </div>
     )
   }
+
+  const yourName = user.name // čia vietoj seno yourName iš dialogo
 
   return (
     <div className="space-y-3">
@@ -73,11 +99,19 @@ export default function GroupsList({ yourName }: GroupsListProps) {
         const yourBalance = yourMember?.balance ?? 0
 
         return (
-          <Link href={`/groups/${group.id}`} key={group.id}>
+          <Link href={`/groups/${group.id_grupe}`} key={group.id_grupe}>
             <Card className="hover:bg-muted/50 transition-colors">
               <CardContent className="p-4 flex justify-between items-center">
-                <h3 className="font-medium">{group.title}</h3>
-                <Badge variant={yourBalance === 0 ? "outline" : yourBalance > 0 ? "success" : "destructive"}>
+                <h3 className="font-medium">{group.pavadinimas}</h3>
+                <Badge
+                  variant={
+                    yourBalance === 0
+                      ? "outline"
+                      : yourBalance > 0
+                        ? "success"
+                        : "destructive"
+                  }
+                >
                   {yourBalance > 0
                     ? `Jums priklauso ${formatCurrency(yourBalance)}`
                     : yourBalance < 0

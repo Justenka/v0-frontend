@@ -1,22 +1,24 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { ArrowLeftCircle } from "lucide-react"
+import { toast } from "sonner"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeftCircle } from "lucide-react"
+
 import { groupApi } from "@/services/api-client"
 import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
 
 export default function NewGroupPage() {
   const router = useRouter()
   const { user } = useAuth()
+
   const [title, setTitle] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -25,23 +27,36 @@ export default function NewGroupPage() {
     if (!title.trim()) return
 
     if (!user) {
-      toast.error("Please login before creating a group")
+      toast.error("Pirmiausia prisijunkite, kad galėtumėte kurti grupes")
       router.push("/login")
+      return
+    }
+
+    const ownerId = Number(user.id)
+    if (Number.isNaN(ownerId)) {
+      console.error("[v0] Owner ID is not a valid number:", user.id)
+      toast.error("Įvyko klaida nustatant vartotojo ID")
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      console.log("[v0] Creating group:", title)
-      const newGroup = await groupApi.createGroup(title, user.id)
+      console.log("[v0] Creating group:", { title, ownerId })
+
+      // jei neturi aprašo lauko – nesiunčiam jo visai (undefined)
+      const newGroup = await groupApi.createGroupBackend(title, ownerId)
+
       console.log("[v0] Group created successfully:", newGroup)
-      toast.success("Group created successfully!")
+      toast.success("Grupė sėkmingai sukurta!")
+
+      // Pas tave "/" atrodo yra grupių sąrašas (sprendžiant iš teksto),
+      // jei norėsi – gali pakeisti į "/groups"
       router.push("/")
       router.refresh()
     } catch (error) {
       console.error("[v0] Failed to create group:", error)
-      toast.error("Failed to create group. Please try again.")
+      toast.error("Nepavyko sukurti grupės. Bandykite dar kartą.")
     } finally {
       setIsSubmitting(false)
     }
@@ -58,7 +73,7 @@ export default function NewGroupPage() {
         <CardHeader>
           <CardTitle>Sukurkite naują grupę</CardTitle>
           <CardDescription>
-            Sukurkite grupę, kad galėtumėte pradėti stebėti išlaidas su draugais, kambariokais ar kolegomis.
+            Sukurkite grupę, kad galėtumėte pradėti sekti išlaidas su draugais, kambariokais ar kolegomis.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -77,7 +92,12 @@ export default function NewGroupPage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" type="button" onClick={() => router.push("/")} disabled={isSubmitting}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => router.push("/")}
+              disabled={isSubmitting}
+            >
               Atšaukti
             </Button>
             <Button type="submit" disabled={isSubmitting || !title.trim() || !user}>
