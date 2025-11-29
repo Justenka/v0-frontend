@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
 import { mockUsers } from "@/lib/mock-data"
+import { authApi, BackendUser } from "@/services/api-client"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -22,144 +23,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Mock: Check for stored user session
-    const storedUser = localStorage.getItem("auth_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+  const storedUser =
+    typeof window !== "undefined" ? localStorage.getItem("auth_user") : null
+
+  if (storedUser) {
+    const parsed = JSON.parse(storedUser) as AuthUser
+
+    if (parsed.createdAt) {
+      parsed.createdAt = new Date(parsed.createdAt)
     }
-    setIsLoading(false)
+    if (parsed.lastLoginAt) {
+      parsed.lastLoginAt = new Date(parsed.lastLoginAt)
+    }
 
-    // Real implementation with Supabase:
-    /*
-    import { createBrowserClient } from '@supabase/ssr'
-    
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    setUser(parsed)
+  }
+  setIsLoading(false)
+}, [])
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        // Fetch user profile from database
-        supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            setUser({
-              ...data,
-              isAuthenticated: true
-            })
-          })
-      }
-      setIsLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          // Update user state
-        } else {
-          setUser(null)
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
-    */
-  }, [])
-
-  const login = async (email: string, password: string) => {
-    // Find user by email or default to Alex (user id "1")
-    const foundUser = mockUsers.find((u) => u.email === email) || mockUsers[0]
-    const mockUser: AuthUser = {
-      ...foundUser,
+  // Helper: map backend user -> AuthUser shape
+  function mapBackendUserToAuthUser(backendUser: BackendUser): AuthUser {
+    return {
+      id: backendUser.id_vartotojas.toString(),
+      name: `${backendUser.vardas} ${backendUser.pavarde}`,
+      email: backendUser.el_pastas,
+      avatar: undefined, // kol kas neturim
+      createdAt: new Date(backendUser.sukurimo_data), // iš DATE/string → Date
+      lastLoginAt: new Date(backendUser.paskutinis_prisijungimas),
+      friends: [], // backend kol kas neteikia
       isAuthenticated: true,
     }
-    setUser(mockUser)
-    localStorage.setItem("auth_user", JSON.stringify(mockUser))
-
-    // Real implementation with Supabase:
-    /*
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
-    if (error) throw error
-    
-    // Fetch user profile
-    const { data: profile } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single()
-    
-    setUser({ ...profile, isAuthenticated: true })
-    */
   }
 
+  const login = async (email: string, password: string) => {
+  try {
+    const { user: backendUser } = await authApi.login(email, password)
+
+    const authUser = mapBackendUserToAuthUser(backendUser)
+    setUser(authUser)
+    localStorage.setItem("auth_user", JSON.stringify(authUser))
+  } catch (err) {
+    setUser(null)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_user")
+    }
+    console.error("Login failed:", err)
+    throw err
+  }
+}
+
   const loginWithGoogle = async () => {
+    // kol kas vis dar mock
     const mockUser: AuthUser = {
       ...mockUsers[0], // Alex
       isAuthenticated: true,
     }
     setUser(mockUser)
     localStorage.setItem("auth_user", JSON.stringify(mockUser))
-
-    // Real implementation with Supabase:
-    /*
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`
-      }
-    })
-    
-    if (error) throw error
-    */
   }
 
   const register = async (name: string, email: string, password: string) => {
+    // kol kas – tik mock
     const mockUser: AuthUser = {
-      ...mockUsers[0], // Alex
-      name, // Use provided name
-      email, // Use provided email
+      ...mockUsers[0],
+      name,
+      email,
       isAuthenticated: true,
     }
     setUser(mockUser)
     localStorage.setItem("auth_user", JSON.stringify(mockUser))
-
-    // Real implementation with Supabase:
-    /*
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name }
-      }
-    })
-    
-    if (error) throw error
-    
-    // Create user profile
-    await supabase.from('users').insert({
-      id: data.user!.id,
-      email,
-      name
-    })
-    */
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("auth_user")
-
-    // Real implementation:
-    /*
-    await supabase.auth.signOut()
-    */
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_user")
+    }
   }
 
   const updateProfile = async (updates: Partial<User>) => {
@@ -168,14 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updatedUser = { ...user, ...updates }
     setUser(updatedUser)
     localStorage.setItem("auth_user", JSON.stringify(updatedUser))
-
-    // Real implementation:
-    /*
-    await supabase
-      .from('users')
-      .update(updates)
-      .eq('id', user.id)
-    */
   }
 
   return (

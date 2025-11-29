@@ -6,14 +6,11 @@ export interface User {
   email: string
   avatar?: string
   createdAt: Date
-  friends: string[] // Array of user IDs
+  lastLoginAt: Date     
+  friends: string[]
 }
 
 export interface AuthUser extends User {
-  // Mock authentication - In production, this would include:
-  // - JWT tokens
-  // - Session data
-  // - OAuth provider info (Google, etc.)
   isAuthenticated: boolean
 }
 

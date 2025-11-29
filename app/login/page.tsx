@@ -26,14 +26,14 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
-      router.push("/")
-    } catch (err) {
-      setError("Invalid email or password")
-    } finally {
-      setIsLoading(false)
-    }
+    await login(email, password)   // jei blogi duomenys -> throw Error
+    router.push("/groups")         // VYKDOM TIK jei login pavyko
+  } catch (err: any) {
+    setError(err.message || "Prisijungti nepavyko")
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
