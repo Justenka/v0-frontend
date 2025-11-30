@@ -45,12 +45,7 @@ export default function GroupPage() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  // ROLE kol kas dar iš mockGroupPermissions
-  const currentUserPermission = mockGroupPermissions.find(
-    (p) => p.groupId === groupId.toString() && p.userId === user?.id,
-  )
-  const userRole: UserRole = currentUserPermission?.role || "guest"
-
+  // NAUJAS – teisingas būdas gauti rolę
   const groupMembers = members.map((member) => {
     const memberUser = mockUsers.find((u) => u.name === member.name)
     const permission = mockGroupPermissions.find(
@@ -63,6 +58,14 @@ export default function GroupPage() {
       role: permission?.role || ("member" as UserRole),
     }
   })
+
+const currentUserMember = groupMembers.find((m) =>
+  Number(m.id) === Number(user?.id)
+)
+
+const userRole: UserRole = currentUserMember
+  ? (currentUserMember.role === "admin" ? "admin" : "member")
+  : "guest"
 
     useEffect(() => {
     const fetchData = async () => {
@@ -110,9 +113,10 @@ export default function GroupPage() {
           transactions: [],
           balance: 0,
         }
-
-        setGroup(groupData)
-        setMembers(groupData.members || [])
+        // Po to, kai gavai backendGroup...
+        const fullGroupData = await groupApi.getGroup(groupId)
+        setGroup(fullGroupData)
+        setMembers(fullGroupData.members || [])
         setTransactions(groupData.transactions || [])
       } catch (error) {
         console.error("Failed to load data:", error)
@@ -211,7 +215,6 @@ export default function GroupPage() {
       </div>
     )
   }
-
   const canAddExpense = userRole !== "guest" && members.length > 0
   const canEdit = userRole === "admin"
 

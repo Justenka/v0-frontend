@@ -72,10 +72,17 @@ export const groupApi = {
   },
 
   // Get a specific group by ID
-  getGroup: async (id: number) => {
-    await delay()
-    return getGroupById(id)
-  },
+ // Get a specific group by ID – tikras backend'as
+getGroup: async (groupId: number) => {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}`)
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || "Nepavyko gauti grupės")
+  }
+
+  return res.json()
+},
 
   // Create a new group
   createGroupBackend: async (
@@ -164,5 +171,41 @@ export const groupApi = {
     const success = deleteMockGroup(groupId)
     if (!success) throw new Error("Failed to delete group")
     return true
+  },
+  // get categories from backend of debt categories
+  async getCategories() {
+    const response = await fetch(`${API_URL}/api/categories`);
+    if (!response.ok) {
+      throw new Error('Nepavyko gauti kategorijų');
+    }
+    return response.json();
+  },
+
+  //Create a new debt
+  async createDebt(data: {
+    groupId: number;
+    title: string;
+    description?: string;
+    amount: number;
+    currencyCode: string;
+    paidByUserId: number;
+    categoryId?: string;
+    splitType: 'equal' | 'percentage' | 'dynamic';
+    splits: { userId: number; amount?: number; percentage?: number }[];
+    lateFeeAmount?: number;
+    lateFeeAfterDays?: number;
+  }) {
+    const response = await fetch(`${API_URL}/api/debts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: 'Serverio klaida' }));
+      throw new Error(err.message || 'Nepavyko sukurti skolos');
+    }
+
+    return response.json();
   },
 }

@@ -20,7 +20,6 @@ import { userApi, groupApi } from "@/services/api-client"
 import { Stepper, StepContent } from "@/components/ui/stepper"
 import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
 import { supportedCurrencies } from "@/lib/currency-api"
-import { mockCategories } from "@/lib/mock-data"
 
 export default function NaujaIslaidaPuslapis() {
   const params = useParams()
@@ -62,12 +61,18 @@ export default function NaujaIslaidaPuslapis() {
   }, [])
 
   useEffect(() => {
-    try {
-      setCategories(mockCategories)
-    } catch (error) {
-      console.error("Nepavyko įkelti kategorijų:", error)
-    }
-  }, [])
+    const fetchCategories = async () => {
+      try {
+        const data = await groupApi.getCategories(); // Use your actual API method
+        setCategories(data);
+      } catch (error) {
+        console.error("Nepavyko įkelti kategorijų:", error);
+        toast.error("Nepavyko įkelti kategorijų");
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -121,41 +126,70 @@ export default function NaujaIslaidaPuslapis() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (currentStep < steps.length - 1) {
-      goToNextStep()
-      return
-    }
-
-    if (!title.trim() || !amount || !paidBy) return
-    if (!userName) {
-      alert("Prieš kuriant išlaidą, nustatykite savo vardą")
-      router.push("/")
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      let splitTypeDescription = "Lygiomis dalimis"
-      if (splitType === "percentage") {
-        splitTypeDescription = "Pagal procentus"
-      } else if (splitType === "dynamic") {
-        splitTypeDescription = "Pagal konkrečias sumas"
-      }
-
-      await groupApi.addTransaction(groupId, title, Number.parseFloat(amount), paidBy, splitTypeDescription, categoryId)
-
-      toast.success("Išlaida sėkmingai pridėta!")
-      router.push(`/groups/${groupId}`)
-    } catch (error) {
-      console.error("Nepavyko sukurti išlaidos:", error)
-      toast.error("Nepavyko pridėti išlaidos.")
-      setIsSubmitting(false)
-    }
+  if (currentStep < steps.length - 1) {
+    goToNextStep();
+    return;
   }
+
+  if (!title.trim() || !amount || !paidBy || !userName) {
+    toast.error("Užpildykite visus privalomus laukus");
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    // Raskome paidByUserId pagal vardą
+    const paidByMember = members.find(m => m.name === paidBy);
+    if (!paidByMember) throw new Error("Nerastas mokėtojas");
+
+    // Suskaičiuojame splits pagal pasirinktą tipą
+    let splits: { userId: number; amount?: number; percentage?: number }[] = [];
+
+    if (splitType === "equal") {
+      const perPerson = Number.parseFloat(amount) / members.length;
+      splits = members.map(m => ({
+        userId: Number(m.id),
+        amount: perPerson
+      }));
+    } else if (splitType === "percentage") {
+      splits = members.map(m => ({
+        userId: Number(m.id),
+        percentage: Number.parseFloat(percentages[m.id] || "0")
+      }));
+    } else if (splitType === "dynamic") {
+      splits = members.map(m => ({
+        userId: Number(m.id),
+        amount: Number.parseFloat(amounts[m.id] || "0")
+      }));
+    }
+
+    await groupApi.createDebt({
+      groupId,
+      title,
+      description: "", // galima pridėti lauką jei nori
+      amount: Number.parseFloat(amount),
+      currencyCode: currency,
+      paidByUserId: Number(paidByMember.id),
+      categoryId: categoryId || undefined,
+      splitType: splitType as "equal" | "percentage" | "dynamic",
+      splits,
+      lateFeeAmount: enableLateFee && lateFeeAmount ? Number.parseFloat(lateFeeAmount) : undefined,
+      lateFeeAfterDays: enableLateFee ? Number(lateFeeDays) : undefined,
+    });
+
+    toast.success("Išlaida sėkmingai pridėta!");
+    router.push(`/groups/${groupId}`);
+  } catch (error: any) {
+    console.error("Klaida kuriant išlaidą:", error);
+    toast.error(error.message || "Nepavyko pridėti išlaidos");
+  } finally {
+    setIsSubmitting(false);
+  }
+}
 
   const handlePercentageChange = (memberId: number, value: string) => {
     setPercentages({ ...percentages, [memberId]: value })
