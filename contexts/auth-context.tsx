@@ -84,16 +84,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const register = async (name: string, email: string, password: string) => {
-    // kol kas – tik mock
-    const mockUser: AuthUser = {
-      ...mockUsers[0],
-      name,
-      email,
-      isAuthenticated: true,
+  try {
+    const { user: backendUser } = await authApi.register(name, email, password)
+
+    const authUser = mapBackendUserToAuthUser(backendUser)
+    setUser(authUser)
+    localStorage.setItem("auth_user", JSON.stringify(authUser))
+  } catch (err) {
+    console.error("Register failed:", err)
+    // jei nepavyko – išvalom userį, kad nebūtų half-state
+    setUser(null)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_user")
     }
-    setUser(mockUser)
-    localStorage.setItem("auth_user", JSON.stringify(mockUser))
+    throw err
   }
+}
 
   const logout = () => {
     setUser(null)

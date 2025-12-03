@@ -59,7 +59,20 @@ export const authApi = {
     return data as LoginResponse
   },
 
-  // čia ateity galėsim dėti register, logout ir pan., jei darysi ant backend
+  async register(name: string, email: string, password: string): Promise<{ user: BackendUser }> {
+    const res = await fetch(`${API_URL}/api/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    })
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      throw new Error(errBody.message || "Registracija nepavyko")
+    }
+
+    return res.json()
+  },
 }
 
 // ---- EXISTING MOCK group API (kol kas neliestam) ----

@@ -78,24 +78,6 @@ if (!user) {
     // Mock: Add message
     console.log(`Send message to ${selectedUserId}: ${newMessage}`)
     setNewMessage("")
-
-    // Real implementation:
-    /*
-    await supabase.from('personal_messages').insert({
-      sender_id: user.id,
-      recipient_id: selectedUserId,
-      content: newMessage
-    })
-    
-    // Create notification
-    await supabase.from('notifications').insert({
-      user_id: selectedUserId,
-      type: 'personal_message',
-      title: 'New Message',
-      message: `${user.name} sent you a message`,
-      action_url: `/messages/${user.id}`
-    })
-    */
   }
 
   const getInitials = (name: string) => {
