@@ -33,7 +33,7 @@ import type { BackendGroupForUser } from "@/types/backend"
 export default function GroupPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
 
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
   const categories = mockCategories
@@ -75,6 +75,8 @@ const userRole: UserRole = currentUserMember
           setLoading(false)
           return
         }
+
+        if (authLoading) return
 
         if (!user) {
           // jei vartotojas neprisijungęs – metam į login
