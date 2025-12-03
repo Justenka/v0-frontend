@@ -9,4 +9,5 @@ export interface Transaction {
   lateFee?: number
   lateFeeDays?: number
   categoryId?: string // Added category support
+  categoryName?: string;
 }

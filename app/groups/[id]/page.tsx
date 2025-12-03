@@ -29,14 +29,15 @@ import { mockGroupPermissions, mockUsers, mockCategories } from "@/lib/mock-data
 import type { UserRole } from "@/types/user"
 import PaymentHistory from "@/components/payment-history"
 import type { BackendGroupForUser } from "@/types/backend"
+import type { Category } from "@/types/category";
 
 export default function GroupPage() {
   const params = useParams()
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
-
+  const [categories, setCategories] = useState<Category[]>([]);
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
-  const categories = mockCategories
+
 
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -69,6 +70,15 @@ const userRole: UserRole = currentUserMember
 
     useEffect(() => {
     const fetchData = async () => {
+
+      // Fetch globalios kategorijos
+      try {
+        const allCategories = await groupApi.getCategories();  // NAUJAS: globalu, ne by-group
+        setCategories(allCategories);
+      } catch (error) {
+        console.error("Nepavyko įkelti kategorijų:", error);
+      }
+
       try {
         if (!groupId || Number.isNaN(groupId)) {
           console.error("Group id is invalid")
@@ -96,6 +106,25 @@ const userRole: UserRole = currentUserMember
           return
         }
 
+        const debts = await groupApi.getDebtsByGroup(groupId)
+
+        const mappedTransactions = debts.map((d: any) => ({
+          id: d.id_skola,
+          title: d.pavadinimas,
+          description: d.aprasymas || "",
+          amount: Number(d.suma),
+          currency:
+            d.valiutos_kodas === 1 ? "EUR" :
+              d.valiutos_kodas === 2 ? "USD" : "PLN",
+          date: d.sukurimo_data,
+          paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+          categoryId: d.kategorija ? String(d.kategorija) : null,
+          splitType: "Lygiai" // kol kas
+        }))
+
+
+
+
         // Mapinam į Group tipą, kad likęs UI veiktų
         const groupData: Group = {
           id: backendGroup.id_grupe, // number
@@ -119,7 +148,7 @@ const userRole: UserRole = currentUserMember
         const fullGroupData = await groupApi.getGroup(groupId)
         setGroup(fullGroupData)
         setMembers(fullGroupData.members || [])
-        setTransactions(groupData.transactions || [])
+        setTransactions(mappedTransactions)
       } catch (error) {
         console.error("Failed to load data:", error)
         setGroup(null)
@@ -307,9 +336,9 @@ const userRole: UserRole = currentUserMember
                 transactions={transactions}
                 canEdit={canEdit}
                 onEdit={handleEditTransaction}
-                categories={categories}
                 onDelete={handleDeleteTransaction}
                 members={members}
+                categories={categories}  // NAUJAS: globalios kategorijos
               />
             </CardContent>
           </Card>

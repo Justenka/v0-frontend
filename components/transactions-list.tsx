@@ -96,6 +96,7 @@ export default function TransactionsList({
     )
   }
 
+  
   return (
     <>
       <div className="space-y-4">
@@ -135,7 +136,7 @@ export default function TransactionsList({
               <SelectContent>
                 <SelectItem value="all">Visos kategorijos</SelectItem>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
+                  <SelectItem key={cat.id || `cat-${cat.name}`} value={cat.id || ""}>
                     {cat.name}
                   </SelectItem>
                 ))}
@@ -210,12 +211,23 @@ export default function TransactionsList({
                           <>
                             <span className="text-gray-300">•</span>
                             <Badge variant="outline" className="text-xs">
-                              {categories.find((c) => c.id === transaction.categoryId)?.name || "Kategorija"}
+                              {transaction.categoryName ||  // Pagrindinis: iš transakcijos (iš DB JOIN)
+                                categories.find((c) => c.id === transaction.categoryId)?.name ||
+                                "Be kategorijos"}
                             </Badge>
                           </>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">Padalinta: {transaction.splitType}</p>
+                    { /* <p className="text-sm text-muted-foreground mt-1">      
+                        Padalinta:{' '}
+                        <span className="font-medium">
+                          {transaction.splitType === 'Lygiai' && 'lygiomis dalimis'}
+                          {transaction.splitType === 'Procentais' && 'procentais'}
+                          {transaction.splitType === 'Pagal sumas' && 'pagal nurodytas sumas'}
+                       
+                          {(!transaction.splitType || !['Lygiai', 'Procentais', 'Pagal sumas'].includes(transaction.splitType)) && 'nežinomas būdas'}
+                        </span>
+                      </p>*/}
                       {transaction.lateFee && transaction.lateFeeDays && (
                         <Badge variant="outline" className="mt-2 text-yellow-700 border-yellow-300">
                           Delspinigiai: {formatCurrency(transaction.lateFee)} po {transaction.lateFeeDays}d

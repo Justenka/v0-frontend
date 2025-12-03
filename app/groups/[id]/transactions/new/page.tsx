@@ -16,7 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeftCircle, ArrowRight, Check, ChevronsLeft, DollarSign } from "lucide-react"
 import type { Member } from "@/types/member"
 import type { Category } from "@/types/category"
-import { userApi, groupApi } from "@/services/api-client"
+import { groupApi } from "@/services/group-api"
+import { useAuth } from "@/contexts/auth-context"
 import { Stepper, StepContent } from "@/components/ui/stepper"
 import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
 import { supportedCurrencies } from "@/lib/currency-api"
@@ -25,6 +26,7 @@ export default function NaujaIslaidaPuslapis() {
   const params = useParams()
   const router = useRouter()
   const groupId = Number(params.id)
+  const { user, isLoading } = useAuth()
 
   const [title, setTitle] = useState("")
   const [amount, setAmount] = useState("")
@@ -32,8 +34,6 @@ export default function NaujaIslaidaPuslapis() {
   const [splitType, setSplitType] = useState("equal")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
-  const [userName, setUserName] = useState("")
-  const [isLoadingUser, setIsLoadingUser] = useState(true)
   const [currency, setCurrency] = useState("EUR")
   const [enableLateFee, setEnableLateFee] = useState(false)
   const [lateFeeAmount, setLateFeeAmount] = useState("")
@@ -46,24 +46,15 @@ export default function NaujaIslaidaPuslapis() {
   const steps = ["Duomenys", "Kas mokėjo", "Dalinimas", "Peržiūra"]
 
   useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const name = await userApi.getUserName()
-        setUserName(name)
-      } catch (error) {
-        console.error("Nepavyko gauti vartotojo vardo:", error)
-      } finally {
-        setIsLoadingUser(false)
-      }
-    }
+  if (!isLoading && !user) {
+    router.push("/login")
+  }
+}, [isLoading, user, router])
 
-    fetchUserName()
-  }, [])
-
-  useEffect(() => {
+ useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await groupApi.getCategories(); // Use your actual API method
+        const data = await groupApi.getCategories();  // NAUJAS: globalu
         setCategories(data);
       } catch (error) {
         console.error("Nepavyko įkelti kategorijų:", error);
@@ -134,7 +125,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     return;
   }
 
-  if (!title.trim() || !amount || !paidBy || !userName) {
+  if (!title.trim() || !amount || !paidBy || !user?.name) {
     toast.error("Užpildykite visus privalomus laukus");
     return;
   }
@@ -389,7 +380,7 @@ const isDynamicValid = () => {
                   <SelectContent>
                     {members.map((member) => (
                       <SelectItem key={member.id} value={member.name}>
-                        {member.name === userName ? "Aš" : member.name}
+                        {member.name === user?.name ? "Aš" : member.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -509,7 +500,7 @@ const isDynamicValid = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Kas mokėjo</p>
-                      <p className="font-medium">{paidBy === userName ? "Aš" : paidBy}</p>
+                      <p className="font-medium">{paidBy === user?.name ? "Aš" : paidBy}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Dalinimo būdas</p>
@@ -541,7 +532,7 @@ const isDynamicValid = () => {
                     <div className="space-y-2">
                       {calculateSplitAmounts().map((split, index) => (
                         <div key={index} className="flex justify-between">
-                          <span>{split.name === userName ? "Aš" : split.name}</span>
+                          <span>{split.name === user?.name ? "Aš" : split.name}</span>
                           <span>{formatCurrency(split.amount, currency)}</span>
                         </div>
                       ))}
@@ -577,8 +568,8 @@ const isDynamicValid = () => {
                   !title.trim() ||
                   !amount ||
                   !paidBy ||
-                  isLoadingUser ||
-                  !userName ||
+                  isLoading ||
+                  !user?.name ||
                   !isPercentageValid() ||
                   !isDynamicValid()
                 }

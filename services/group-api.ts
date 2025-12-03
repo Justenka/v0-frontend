@@ -1,7 +1,7 @@
 // services/group-api.ts
 import type { BackendGroupForUser } from "@/types/backend"
 import type { Group } from "@/types/group"
-
+import type { Category } from "@/types/category";
 import {
   getGroupById,
   addMemberToGroup,
@@ -109,14 +109,26 @@ export const groupApi = {
         if (!success) throw new Error("Failed to delete group")
         return true
     },
-    // get categories from backend of debt categories
-    async getCategories() {
-        const response = await fetch(`${API_URL}/api/categories`);
-        if (!response.ok) {
-        throw new Error('Nepavyko gauti kategorijų');
-        }
-        return response.json();
-    },
+
+    // Gauti kategorijas (globalias, nes nėra per grupę)
+    async getCategories(): Promise<Category[]> {
+    const response = await fetch(`${API_URL}/api/categories`);
+    if (!response.ok) {
+      throw new Error('Nepavyko gauti kategorijų');
+    }
+    const data = await response.json();
+
+    // Normalizuojame – visada grąžiname { id: string, name: string }
+    return data.map((cat: any) => ({
+      id: String(cat.id_kategorija ?? cat.id ?? ""), // saugumas
+      name: cat.name ?? cat.pavadinimas ?? "Be pavadinimo",
+    }));
+  },
+
+  // Jei dar naudojate getCategoriesByGroup – nukreipkite į tą patį
+  async getCategoriesByGroup(_groupId: number): Promise<Category[]> {
+    return this.getCategories(); // globalios kategorijos
+  },
 
     //Create a new debt
     async createDebt(data: {
@@ -148,11 +160,13 @@ export const groupApi = {
     
     // Gauti visas grupės skolas
     async getDebtsByGroup(groupId: number) {
-        const res = await fetch(`${API_URL}/api/debts-by-group/${groupId}`);
+        const res = await fetch(`${API_URL}/api/debts-by-group/${groupId}`)
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || "Nepavyko gauti skolų");
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko gauti skolų")
         }
-        return res.json();
+        return res.json()
     },
+
+    
 }
