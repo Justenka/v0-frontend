@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Settings, UserPlus, Shield, Trash2, Link2, Copy, Check, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import type { UserRole } from "@/types/user"
-import { groupApi } from "@/services/api-client"
+import { groupApi } from "@/services/group-api"
 
 interface GroupSettingsDialogProps {
   open: boolean

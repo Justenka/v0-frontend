@@ -4,7 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
 import { mockUsers } from "@/lib/mock-data"
-import { authApi} from "@/services/api-client"
+import { authApi} from "@/services/auth-api"
 import type { BackendUser } from "@/types/backend"
 
 interface AuthContextType {
@@ -100,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     throw err
   }
 }
-
   const logout = () => {
     setUser(null)
     if (typeof window !== "undefined") {

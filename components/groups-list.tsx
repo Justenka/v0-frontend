@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
-import { groupApi } from "@/services/api-client"
+import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { BackendGroupForUser } from "@/types/backend"
 

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import type { Member } from "@/types/member"
 import SettleUpDialog from "@/components/settle-up-dialog"
-import { userApi } from "@/services/api-client"
 
 interface MembersListProps {
   members: Member[]
@@ -18,18 +17,20 @@ export default function MembersList({ members, onSettleUp, onRemoveMember }: Mem
   const [isSettleUpOpen, setIsSettleUpOpen] = useState(false)
   const [userName, setUserName] = useState("")
 
-  useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const name = await userApi.getUserName()
-        setUserName(name)
-      } catch (error) {
-        console.error("Failed to fetch user name:", error)
-      }
-    }
+  //paskui sutvarkyt reikia
 
-    fetchUserName()
-  }, [])
+  // useEffect(() => {
+  //   const fetchUserName = async () => {
+  //     try {
+  //       const name = await userApi.getUserName()
+  //       setUserName(name)
+  //     } catch (error) {
+  //       console.error("Failed to fetch user name:", error)
+  //     }
+  //   }
+
+  //   fetchUserName()
+  // }, [])
 
   const handleSettleUpClick = (member: Member) => {
     setSelectedMember(member)
