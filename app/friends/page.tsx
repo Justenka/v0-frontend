@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -26,7 +26,11 @@ type FriendRequestItem = FriendRequestDTO
 
 export default function FriendsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading } = useAuth()
+
+  const initialFriendId = searchParams.get("friendId")
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(initialFriendId)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
@@ -324,13 +328,13 @@ export default function FriendsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/messages/${friend.id}`)}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Žinutė
-                    </Button>
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/messages?friendId=${friend.id}`)}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Žinutė
+                      </Button>
                     <Button
                       variant="ghost"
                       size="sm"
