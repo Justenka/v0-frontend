@@ -25,19 +25,18 @@ import { GroupSettingsDialog } from "@/components/group-settings-dialog"
 import { GroupChat } from "@/components/group-chat"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
-import { mockGroupPermissions, mockUsers, mockCategories } from "@/lib/mock-data"
 import type { UserRole } from "@/types/user"
 import PaymentHistory from "@/components/payment-history"
 import type { BackendGroupForUser } from "@/types/backend"
-import type { Category } from "@/types/category";
+import type { Category } from "@/types/category"
+import { toast } from "sonner"
 
 export default function GroupPage() {
   const params = useParams()
   const router = useRouter()
-  const { user, isLoading: authLoading } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { user, isLoading } = useAuth()
+  const [categories, setCategories] = useState<Category[]>([])
   const groupId = params?.id ? Number.parseInt(params.id as string) : Number.NaN
-
 
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -46,37 +45,40 @@ export default function GroupPage() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  // NAUJAS – teisingas būdas gauti rolę
-  const groupMembers = members.map((member) => {
-    const memberUser = mockUsers.find((u) => u.name === member.name)
-    const permission = mockGroupPermissions.find(
-      (p) => p.groupId === groupId.toString() && p.userId === memberUser?.id,
-    )
-    return {
-      id: memberUser?.id || member.id.toString(),
-      name: member.name,
-      email: memberUser?.email || `${member.name.toLowerCase()}@example.com`,
-      role: permission?.role || ("member" as UserRole),
+  // Auth guard
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
     }
-  })
+  }, [isLoading, user, router])
 
-const currentUserMember = groupMembers.find((m) =>
-  Number(m.id) === Number(user?.id)
-)
+  // Gauname user rolę iš backend'o (group.role)
+  const userRole: UserRole =
+    typeof group?.role === "string"
+      ? group.role
+      : group?.role === 3
+      ? "guest"
+      : group?.role === 2
+      ? "member"
+      : "admin"
+  console.log("User role:", group?.role)
+  // Mapinam narius settings dialogui
+  // Kol kas naudojame placeholder email ir role, vėliau reikės gauti iš backend'o
+  const groupMembers = members.map((member) => ({
+    id: member.id.toString(),
+    name: member.name,
+    email: `${member.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+    role: "member" as UserRole, // TODO: gauti realią rolę iš backend'o
+  }))
 
-const userRole: UserRole = currentUserMember
-  ? (currentUserMember.role === "admin" ? "admin" : "member")
-  : "guest"
-
-    useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
-
       // Fetch globalios kategorijos
       try {
-        const allCategories = await groupApi.getCategories();  // NAUJAS: globalu, ne by-group
-        setCategories(allCategories);
+        const allCategories = await groupApi.getCategories()
+        setCategories(allCategories)
       } catch (error) {
-        console.error("Nepavyko įkelti kategorijų:", error);
+        console.error("Nepavyko įkelti kategorijų:", error)
       }
 
       try {
@@ -85,8 +87,6 @@ const userRole: UserRole = currentUserMember
           setLoading(false)
           return
         }
-
-        if (authLoading) return
 
         if (!user) {
           // jei vartotojas neprisijungęs – metam į login
@@ -122,29 +122,26 @@ const userRole: UserRole = currentUserMember
           splitType: "Lygiai" // kol kas
         }))
 
-
-
-
-        // Mapinam į Group tipą, kad likęs UI veiktų
+        // Mapinam į Group tipą
         const groupData: Group = {
-          id: backendGroup.id_grupe, // number
+          id: backendGroup.id_grupe,
           title: backendGroup.pavadinimas,
           description: backendGroup.aprasas ?? null,
           createdAt: backendGroup.sukurimo_data,
 
-          ownerId: undefined, // jei SELECT'e neturi fk_id_vartotojas, paliekam kol kas
+          ownerId: undefined,
           ownerFirstName: backendGroup.owner_vardas,
           ownerLastName: backendGroup.owner_pavarde,
 
           role: backendGroup.role,
           memberStatus: backendGroup.nario_busena,
 
-          // frontend logika – kol kas tuščia, kol neprijungsim realių narių / skolų iš DB
           members: [],
           transactions: [],
           balance: 0,
         }
-        // Po to, kai gavai backendGroup...
+
+        // Gauname pilnus grupės duomenis
         const fullGroupData = await groupApi.getGroup(groupId)
         setGroup(fullGroupData)
         setMembers(fullGroupData.members || [])
@@ -215,10 +212,31 @@ const userRole: UserRole = currentUserMember
 
   const handleEditTransaction = (transaction: Transaction) => {
     console.log("Edit transaction:", transaction)
+    toast.info("Redagavimo funkcionalumas dar neimplementuotas")
   }
 
-  const handleDeleteTransaction = (transactionId: number) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
+  const handleDeleteTransaction = async (transactionId: number) => {
+    if (!user) {
+      toast.error("Neprisijungęs vartotojas")
+      return
+    }
+
+    try {
+      await groupApi.deleteDebt(transactionId, Number(user.id))
+      
+      // Pašaliname iš local state
+      setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
+      
+      // Refresh grupės duomenis
+      const groupData = await groupApi.getGroup(groupId)
+      if (groupData) {
+        setGroup(groupData)
+        setMembers(groupData.members || [])
+      }
+    } catch (error: any) {
+      console.error("Failed to delete transaction:", error)
+      throw error // Throw error kad TransactionsList gautų ir parodytų toast
+    }
   }
 
   if (loading) {
@@ -246,8 +264,8 @@ const userRole: UserRole = currentUserMember
       </div>
     )
   }
+  
   const canAddExpense = userRole !== "guest" && members.length > 0
-  const canEdit = userRole === "admin"
 
   return (
     <div className="container max-w-4xl py-10">
@@ -334,11 +352,12 @@ const userRole: UserRole = currentUserMember
             <CardContent>
               <TransactionsList
                 transactions={transactions}
-                canEdit={canEdit}
+                members={members}
+                categories={categories}
+                userRole={userRole}
+                currentUserId={user?.id ? Number(user.id) : undefined}
                 onEdit={handleEditTransaction}
                 onDelete={handleDeleteTransaction}
-                members={members}
-                categories={categories}  // NAUJAS: globalios kategorijos
               />
             </CardContent>
           </Card>

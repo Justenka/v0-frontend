@@ -168,5 +168,21 @@ export const groupApi = {
         return res.json()
     },
 
-    
+    // Ištrinti skolą (išlaidą)
+    async deleteDebt(debtId: number, userId: number): Promise<void> {
+        const res = await fetch(`${API_URL}/api/debts/${debtId}?userId=${userId}`, {
+            method: 'DELETE',
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-user-id': String(userId) 
+            },
+        })
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko ištrinti išlaidos")
+        }
+
+        return res.json()
+    },
 }

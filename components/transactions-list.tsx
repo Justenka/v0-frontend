@@ -12,31 +12,38 @@ import type { Transaction } from "@/types/transaction"
 import type { Member } from "@/types/member"
 import { toast } from "sonner"
 import { EditTransactionDialog } from "./edit-transaction-dialog"
+import { useAuth } from "@/contexts/auth-context"
+import type { UserRole } from "@/types/user"
 
 interface TransactionsListProps {
   transactions: Transaction[]
   members: Member[]
   categories: Array<{ id: string; name: string }>
-  canEdit?: boolean
+  userRole: UserRole
+  currentUserId?: number
   onEdit?: (transaction: Transaction) => void
-  onDelete?: (transactionId: number) => void
+  onDelete?: (transactionId: number) => Promise<void>
 }
 
 export default function TransactionsList({
   transactions,
   members,
   categories,
-  canEdit = false,
+  userRole,
+  currentUserId,
   onEdit,
   onDelete,
 }: TransactionsListProps) {
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterBy, setFilterBy] = useState<string>("all")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all") // 🆕 NEW STATE
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("date-desc")
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+
 
   // Get unique payers for filter
   const uniquePayers = Array.from(new Set(transactions.map((t) => t.paidBy)))
@@ -48,10 +55,7 @@ export default function TransactionsList({
       transaction.paidBy.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesFilter = filterBy === "all" || transaction.paidBy === filterBy
-
-    // 🆕 NEW: Filter by category
-    const matchesCategory =
-      categoryFilter === "all" || transaction.categoryId === categoryFilter
+    const matchesCategory = categoryFilter === "all" || transaction.categoryId === categoryFilter
 
     return matchesSearch && matchesFilter && matchesCategory
   })
@@ -71,8 +75,34 @@ export default function TransactionsList({
         return 0
     }
   })
+  
+  // Patikrinti ar vartotojas gali redaguoti/ištrinti transakciją
+  const canEditTransaction = (transaction: Transaction): boolean => {
+    if (userRole === "guest") return false
+    
+    // Admin gali tik ištrinti (ne redaguoti)
+    // Tik mokėtojas gali redaguoti
+    // user.name jau yra "Vardas Pavardė" formato iš auth-context
+    const isPayer = transaction.paidBy === user?.name
+    
+    return isPayer
+  }
+
+  const canDeleteTransaction = (transaction: Transaction): boolean => {
+    if (userRole === "guest") return false
+    
+    // Admin arba mokėtojas gali ištrinti
+    const isAdmin = userRole === "admin"
+    const isPayer = transaction.paidBy === user?.name
+    
+    return isAdmin || isPayer
+  }
 
   const handleEdit = (transaction: Transaction) => {
+    if (!canEditTransaction(transaction)) {
+      toast.error("Tik mokėtojas gali redaguoti šią išlaidą")
+      return
+    }
     setEditingTransaction(transaction)
     setIsEditDialogOpen(true)
   }
@@ -81,10 +111,26 @@ export default function TransactionsList({
     onEdit?.(updatedTransaction)
   }
 
-  const handleDelete = (transactionId: number) => {
-    if (confirm("Ar tikrai norite ištrinti šią išlaidą?")) {
-      onDelete?.(transactionId)
+  const handleDelete = async (transaction: Transaction) => {
+    if (!canDeleteTransaction(transaction)) {
+      toast.error("Neturite teisės ištrinti šios išlaidos")
+      return
+    }
+
+    if (!confirm("Ar tikrai norite ištrinti šią išlaidą?")) {
+      return
+    }
+
+    setDeletingId(transaction.id)
+    
+    try {
+      await onDelete?.(transaction.id)
       toast.success("Išlaida ištrinta")
+    } catch (error: any) {
+      console.error("Failed to delete transaction:", error)
+      toast.error(error.message || "Nepavyko ištrinti išlaidos")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -96,7 +142,6 @@ export default function TransactionsList({
     )
   }
 
-  
   return (
     <>
       <div className="space-y-4">
@@ -128,7 +173,7 @@ export default function TransactionsList({
               </SelectContent>
             </Select>
 
-            {/* 🆕 Filter by category */}
+            {/* Filter by category */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Pagal kategoriją" />
@@ -172,77 +217,86 @@ export default function TransactionsList({
               <p className="text-muted-foreground">Išlaidų nerasta</p>
             </div>
           ) : (
-            sortedTransactions.map((transaction) => (
-              <Card key={transaction.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <h3 className="font-medium">{transaction.title}</h3>
-                        {canEdit && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(transaction)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Redaguoti
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDelete(transaction.id)} className="text-red-600">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Ištrinti
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+            sortedTransactions.map((transaction) => {
+              const canEdit = canEditTransaction(transaction)
+              const canDelete = canDeleteTransaction(transaction)
+              const showMenu = canEdit || canDelete
+
+              return (
+                <Card key={transaction.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <h3 className="font-medium">{transaction.title}</h3>
+                          {showMenu && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  disabled={deletingId === transaction.id}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {canEdit && (
+                                  <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Redaguoti
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDelete(transaction)} 
+                                    className="text-red-600"
+                                    disabled={deletingId === transaction.id}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    {deletingId === transaction.id ? "Trinamas..." : "Ištrinti"}
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(transaction.date).toLocaleDateString("lt-LT")}
+                          </p>
+                          <span className="text-gray-300">•</span>
+                          <Badge variant="secondary" className="text-xs">
+                            Mokėjo: {transaction.paidBy}
+                          </Badge>
+                          {transaction.categoryId && (
+                            <>
+                              <span className="text-gray-300">•</span>
+                              <Badge variant="outline" className="text-xs">
+                                {transaction.categoryName ||
+                                  categories.find((c) => c.id === transaction.categoryId)?.name ||
+                                  "Be kategorijos"}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                        {transaction.lateFee && transaction.lateFeeDays && (
+                          <Badge variant="outline" className="mt-2 text-yellow-700 border-yellow-300">
+                            Delspinigiai: {formatCurrency(transaction.lateFee)} po {transaction.lateFeeDays}d
+                          </Badge>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(transaction.date).toLocaleDateString("lt-LT")}
+                      <div className="text-right ml-4">
+                        <p className="font-semibold text-lg">
+                          {formatCurrency(transaction.amount, transaction.currency)}
                         </p>
-                        <span className="text-gray-300">•</span>
-                        <Badge variant="secondary" className="text-xs">
-                          Mokėjo: {transaction.paidBy}
-                        </Badge>
-                        {transaction.categoryId && (
-                          <>
-                            <span className="text-gray-300">•</span>
-                            <Badge variant="outline" className="text-xs">
-                              {transaction.categoryName ||  // Pagrindinis: iš transakcijos (iš DB JOIN)
-                                categories.find((c) => c.id === transaction.categoryId)?.name ||
-                                "Be kategorijos"}
-                            </Badge>
-                          </>
-                        )}
                       </div>
-                    { /* <p className="text-sm text-muted-foreground mt-1">      
-                        Padalinta:{' '}
-                        <span className="font-medium">
-                          {transaction.splitType === 'Lygiai' && 'lygiomis dalimis'}
-                          {transaction.splitType === 'Procentais' && 'procentais'}
-                          {transaction.splitType === 'Pagal sumas' && 'pagal nurodytas sumas'}
-                       
-                          {(!transaction.splitType || !['Lygiai', 'Procentais', 'Pagal sumas'].includes(transaction.splitType)) && 'nežinomas būdas'}
-                        </span>
-                      </p>*/}
-                      {transaction.lateFee && transaction.lateFeeDays && (
-                        <Badge variant="outline" className="mt-2 text-yellow-700 border-yellow-300">
-                          Delspinigiai: {formatCurrency(transaction.lateFee)} po {transaction.lateFeeDays}d
-                        </Badge>
-                      )}
                     </div>
-                    <div className="text-right ml-4">
-                      <p className="font-semibold text-lg">
-                        {formatCurrency(transaction.amount, transaction.currency)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              )
+            })
           )}
         </div>
       </div>
