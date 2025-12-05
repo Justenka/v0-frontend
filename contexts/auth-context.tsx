@@ -10,7 +10,7 @@ import type { BackendUser } from "@/types/backend"
 interface AuthContextType {
   user: AuthUser | null
   login: (email: string, password: string) => Promise<void>
-  loginWithGoogle: () => Promise<void>
+  loginWithGoogle: (idToken: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   updateProfile: (updates: Partial<User>) => Promise<void>
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 }
 
-  const loginWithGoogle = async () => {
+  /*const loginWithGoogle = async () => {
     // kol kas vis dar mock
     const mockUser: AuthUser = {
       ...mockUsers[0], // Alex
@@ -81,7 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(mockUser)
     localStorage.setItem("auth_user", JSON.stringify(mockUser))
+  }*/
+
+    const loginWithGoogle = async (idToken: string) => {
+  try {
+    const { user: backendUser } = await authApi.loginWithGoogle(idToken)
+
+    const authUser = mapBackendUserToAuthUser(backendUser)
+    setUser(authUser)
+    localStorage.setItem("auth_user", JSON.stringify(authUser))
+  } catch (err) {
+    console.error("Google login failed:", err)
+    setUser(null)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_user")
+    }
+    throw err
   }
+}
+
 
   const register = async (name: string, email: string, password: string) => {
   try {
