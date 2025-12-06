@@ -33,4 +33,21 @@ export const authApi = {
 
     return res.json()
   },
+
+  async loginWithGoogle(idToken: string): Promise<{ user: BackendUser; token?: string; avatarUrl?: string }> {
+  const res = await fetch(`${API_BASE}/api/login/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.message || "Prisijungimas per Google nepavyko");
+  }
+
+  return res.json();
+  }
+
+
 }
