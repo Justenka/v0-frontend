@@ -276,7 +276,7 @@ export default function GroupPage() {
         </Link>
 
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">{group.title}</h1>
+          <h1 className="text-3xl font-bold">{group.pavadinimas}</h1>
           <div className="flex items-center gap-2">
             <Link href={`/groups/${groupId}/reports`}>
               <Button variant="outline" size="sm">
