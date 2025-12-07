@@ -1,17 +1,16 @@
 export interface Message {
-  id: string
-  senderId: string
+  id: number
+  senderId: number
   senderName: string
   content: string
   timestamp: Date
-  read: boolean
+  read: number
 }
 
 export interface GroupMessage extends Message {
-  groupId: string
+  groupId: number
 }
 
 export interface PersonalMessage extends Message {
-  recipientId: string
+  recipientId: number
 }
-

@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +25,12 @@ interface Conversation {
   messages: MessageDTO[]
 }
 
+interface ConversationSummary {
+  friendId: string
+  unreadCount: number
+  lastMessage?: MessageDTO
+}
+
 export default function MessagesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -42,14 +47,20 @@ export default function MessagesPage() {
   const [hasInitialSelected, setHasInitialSelected] = useState(false)
   const initialFriendId = searchParams.get("friendId")
 
-  // Auth guard
+  const [summary, setSummary] = useState<ConversationSummary[]>([])
+
+  // scroll valdymas chat'e
+  const chatScrollRef = useRef<HTMLDivElement | null>(null)
+  const lastMessageIdRef = useRef<number | null>(null)
+
+  // ───────────────────── Auth guard ─────────────────────
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
   }, [isLoading, user, router])
 
-  // Užkraunam draugus ir sukuriam tuščius pokalbius
+  // ───────────────── Draugų užkrovimas ──────────────────
   useEffect(() => {
     const loadFriends = async () => {
       if (!user) return
@@ -65,9 +76,6 @@ export default function MessagesPage() {
           })),
         )
 
-        // pirmą kartą – parenkam iš karto pokalbį:
-        // 1) jei yra ?friendId URL'e – jį
-        // 2) jei nėra – pirmą draugą sąraše
         if (!hasInitialSelected) {
           const defaultId = initialFriendId ?? (friends[0]?.id ?? null)
           if (defaultId) {
@@ -88,49 +96,189 @@ export default function MessagesPage() {
     }
   }, [isLoading, user, hasInitialSelected, initialFriendId])
 
-  // Kai pasirenkam vartotoją – užkraunam jo pokalbį, jei dar neįkrautas
+  // ───────── Realtime polling aktyviam pokalbiui ────────
   useEffect(() => {
-    const loadConversation = async () => {
-      if (!user || !selectedUserId) return
+    if (!user || !selectedUserId) return
 
-      const conv = conversations.find((c) => c.user.id === selectedUserId)
-      if (!conv) return
+    let cancelled = false
+    let intervalId: ReturnType<typeof setInterval> | null = null
 
-      if (conv.messages.length > 0) return // jau įkrautas
-
+    const loadConversation = async (initial = false) => {
       try {
         const msgs = await messagesApi.getConversation(
           Number(user.id),
           Number(selectedUserId),
         )
 
+        if (cancelled) return
+
         setConversations((prev) =>
-          prev.map((c) =>
-            c.user.id === selectedUserId ? { ...c, messages: msgs } : c,
-          ),
+          prev.map((c) => {
+            if (c.user.id !== selectedUserId) return c
+
+            if (initial && c.messages.length === 0) {
+              return { ...c, messages: msgs }
+            }
+
+            const existingIds = new Set(c.messages.map((m) => m.id))
+            const merged = [...c.messages]
+
+            for (const m of msgs) {
+              if (!existingIds.has(m.id)) {
+                merged.push(m)
+              }
+            }
+
+            merged.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+            return { ...c, messages: merged }
+          }),
         )
+
+        // auto-read tik ne pirmo užkrovimo metu
+        if (!initial) {
+          const myId = Number(user.id)
+
+          void messagesApi
+            .markConversationRead(myId, Number(selectedUserId))
+            .catch(() => {})
+
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.user.id !== selectedUserId) return c
+              const updated = c.messages.map((m) =>
+                String(m.recipientId) === String(myId) && m.read === 0
+                  ? { ...m, read: 1 }
+                  : m,
+              )
+              return { ...c, messages: updated }
+            }),
+          )
+        }
       } catch (err: any) {
         console.error("Failed to load conversation:", err)
-        toast.error(err.message || "Nepavyko užkrauti pokalbio")
+        if (initial) {
+          toast.error(err.message || "Nepavyko užkrauti pokalbio")
+        }
       }
     }
 
-    void loadConversation()
-  }, [selectedUserId, user, conversations])
+    void loadConversation(true)
 
+    intervalId = setInterval(() => {
+      void loadConversation(false)
+    }, 1000)
+
+    return () => {
+      cancelled = true
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [user, selectedUserId])
+
+  // ───── Global summary polling (preview + unread) ──────
+  useEffect(() => {
+    if (!user || conversations.length === 0) return
+
+    let cancelled = false
+
+    const pollSummaries = async () => {
+      try {
+        const userId = Number(user.id)
+        const snapshot = conversations
+        const result: ConversationSummary[] = []
+
+        for (const c of snapshot) {
+          const msgs = await messagesApi.getConversation(
+            userId,
+            Number(c.user.id),
+          )
+
+          const unreadCount = msgs.filter(
+            (m) => String(m.recipientId) === String(userId) && m.read === 0,
+          ).length
+
+          const lastMessage =
+            msgs.length > 0 ? msgs[msgs.length - 1] : undefined
+
+          result.push({
+            friendId: c.user.id,
+            unreadCount,
+            lastMessage,
+          })
+        }
+
+        if (!cancelled) {
+          setSummary(result)
+        }
+      } catch (err) {
+        console.error("Failed to poll summaries:", err)
+      }
+    }
+
+    void pollSummaries()
+    const id = setInterval(() => {
+      void pollSummaries()
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [user, conversations.length])
+
+  // ───────────── Chat scroll logika (su chat switch) ─────────────
+  useEffect(() => {
+    if (!selectedUserId) return
+
+    const conv = conversations.find((c) => c.user.id === selectedUserId)
+    if (!conv) return
+    if (conv.messages.length === 0) return
+
+    const viewport = chatScrollRef.current
+    if (!viewport) return
+
+    const latestId = conv.messages[conv.messages.length - 1].id
+    const prevId = lastMessageIdRef.current
+
+    const distanceFromBottom =
+      viewport.scrollHeight - (viewport.scrollTop + viewport.clientHeight)
+    const isNearBottom = distanceFromBottom < 80
+
+    // jei pirmas kartas šiame chate → visada į apačią
+    if (prevId === null) {
+      viewport.scrollTop = viewport.scrollHeight
+      lastMessageIdRef.current = latestId
+      return
+    }
+
+    // jei atsirado nauja žinutė ir buvom arti apačios → scrollinam
+    if (latestId !== prevId && isNearBottom) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+
+    lastMessageIdRef.current = latestId
+  }, [selectedUserId, conversations])
+
+  // ─────────────────── Loading / auth ──────────────────
   if (isLoading || isDataLoading) {
     return <div className="text-center py-20 text-gray-500">Kraunama...</div>
   }
-
   if (!user) return null
 
-  // praturtinam pokalbius lastMessage + unread
+  // ───── Conversations + meta (preview + unreadCount) ─────
   const conversationsWithMeta = conversations.map((conv) => {
-    const msgs = conv.messages
-    const lastMessage = msgs.length > 0 ? msgs[msgs.length - 1] : undefined
-    const unreadCount = msgs.filter(
-      (m) => m.recipientId === user.id && !m.read,
-    ).length
+    const meta = summary.find((s) => s.friendId === conv.user.id)
+
+    const lastMessage =
+      meta?.lastMessage ||
+      (conv.messages.length > 0
+        ? conv.messages[conv.messages.length - 1]
+        : undefined)
+
+    const unreadCount =
+      meta?.unreadCount ??
+      conv.messages.filter(
+        (m) => String(m.recipientId) === String(user.id) && m.read === 0,
+      ).length
 
     return { ...conv, lastMessage, unreadCount }
   })
@@ -143,10 +291,11 @@ export default function MessagesPage() {
     (c) => c.user.id === selectedUserId,
   )
 
+  // ───────────────────── Handlers ───────────────────────
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !selectedUserId || !user) return
-    if (isSending) return // apsauga nuo greito dvigubo paspaudimo
+    if (isSending) return
 
     setIsSending(true)
     try {
@@ -163,7 +312,11 @@ export default function MessagesPage() {
           const alreadyExists = c.messages.some((m) => m.id === msg.id)
           if (alreadyExists) return c
 
-          return { ...c, messages: [...c.messages, msg] }
+          const nextMessages = [...c.messages, msg].sort(
+            (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+          )
+
+          return { ...c, messages: nextMessages }
         }),
       )
       setNewMessage("")
@@ -178,17 +331,44 @@ export default function MessagesPage() {
   const getInitials = (name: string) =>
     name
       .split(" ")
+      .filter((n) => n.length > 0)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
 
+  const handleSelectConversation = (friendId: string) => {
+    setSelectedUserId(friendId)
+    // naujam chate norim iškart nuleisti į apačią → resetinam
+    lastMessageIdRef.current = null
+
+    if (!user) return
+    const myId = Number(user.id)
+
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.user.id !== friendId) return c
+
+        const updatedMessages = c.messages.map((m) =>
+          String(m.recipientId) === String(myId) && m.read === 0
+            ? { ...m, read: 1 }
+            : m,
+        )
+
+        return { ...c, messages: updatedMessages }
+      }),
+    )
+
+    void messagesApi.markConversationRead(myId, Number(friendId)).catch(() => {})
+  }
+
+  // ─────────────────────── UI ───────────────────────────
   return (
     <div className="container max-w-6xl py-10">
       <h1 className="text-3xl font-bold mb-8">Žinutės</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-[350px_1fr] gap-6 h-[700px]">
+      <div className="grid grid-cols-1 md:grid-cols-[350px_1fr] gap-6 h-[calc(100vh-220px)]">
         {/* Conversations List */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col h-full min-h-0">
           <div className="p-4 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -201,7 +381,7 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-2">
               {filteredConversations.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -211,7 +391,7 @@ export default function MessagesPage() {
                 filteredConversations.map((conv) => (
                   <button
                     key={conv.user.id}
-                    onClick={() => setSelectedUserId(conv.user.id)}
+                    onClick={() => handleSelectConversation(conv.user.id)}
                     className={`w-full p-3 rounded-lg hover:bg-gray-50 transition-colors text-left ${
                       selectedUserId === conv.user.id
                         ? "bg-blue-50 border border-blue-200"
@@ -242,7 +422,8 @@ export default function MessagesPage() {
                         {conv.lastMessage && (
                           <>
                             <p className="text-sm text-gray-600 truncate">
-                              {conv.lastMessage.senderId === user.id
+                              {String(conv.lastMessage.senderId) ===
+                              String(user.id)
                                 ? "Jūs: "
                                 : ""}
                               {conv.lastMessage.content.length > 30
@@ -267,10 +448,10 @@ export default function MessagesPage() {
         </Card>
 
         {/* Chat Area */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col h-full min-h-0">
           {selectedConversation ? (
             <>
-              {/* Chat Header */}
+              {/* Header */}
               <div className="p-4 border-b flex items-center gap-3">
                 <Avatar className="h-10 w-10">
                   <AvatarImage
@@ -291,11 +472,15 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              {/* Messages */}
-              <ScrollArea className="flex-1 p-4">
+              {/* Messages – dabar paprastas div su overflow-y-auto */}
+              <div
+                ref={chatScrollRef}
+                className="flex-1 min-h-0 px-4 py-4 overflow-y-auto"
+              >
                 <div className="space-y-4">
                   {selectedConversation.messages.map((message) => {
-                    const isOwnMessage = message.senderId === user.id
+                    const isOwnMessage =
+                      String(message.senderId) === String(user.id)
                     return (
                       <div
                         key={message.id}
@@ -330,9 +515,9 @@ export default function MessagesPage() {
                     )
                   })}
                 </div>
-              </ScrollArea>
+              </div>
 
-              {/* Message Input */}
+              {/* Input */}
               <form onSubmit={handleSendMessage} className="border-t p-4">
                 <div className="flex gap-2">
                   <Input
