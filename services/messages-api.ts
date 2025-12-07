@@ -7,7 +7,7 @@ export interface MessageDTO {
   recipientId: string
   content: string
   timestamp: Date
-  read: boolean
+  read: number
 }
 
 interface MessagesResponse {
@@ -17,7 +17,7 @@ interface MessagesResponse {
     recipientId: string
     content: string
     timestamp: string
-    read: boolean
+    read: number
   }[]
 }
 
@@ -38,12 +38,16 @@ export const messagesApi = {
     return data.messages
       .map((m) => ({
         ...m,
-        timestamp: new Date(m.timestamp), // iš 'YYYY-MM-DD' į Date
+        timestamp: new Date(m.timestamp),
       }))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   },
 
-  async sendMessage(userId: number, friendId: number, text: string): Promise<MessageDTO> {
+  async sendMessage(
+    userId: number,
+    friendId: number,
+    text: string,
+  ): Promise<MessageDTO> {
     const res = await fetch(`${API_BASE}/api/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -62,7 +66,7 @@ export const messagesApi = {
         recipientId: string
         content: string
         timestamp: string
-        read: boolean
+        read: number
       }
     }
 
@@ -70,5 +74,15 @@ export const messagesApi = {
       ...data.message,
       timestamp: new Date(data.message.timestamp),
     }
+  },
+
+  async markConversationRead(userId: number, friendId: number): Promise<void> {
+    await fetch(`${API_BASE}/api/messages/mark-read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, friendId }),
+    }).catch(() => {
+      // nekeliame error – UI vistiek jau atsinaujino vietoje
+    })
   },
 }

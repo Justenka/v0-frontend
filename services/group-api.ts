@@ -11,12 +11,12 @@ import {
   deleteMockGroup,
 } from "@/lib/mock-data"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
 export const groupApi = {
     // Get a specific group by ID – tikras backend'as
     getGroup: async (groupId: number) => {
-        const res = await fetch(`${API_URL}/api/groups/${groupId}`)
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}`)
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}))
@@ -32,7 +32,7 @@ export const groupApi = {
     ownerId: number,
     description?: string,
     ): Promise<BackendGroupForUser> => {
-        const res = await fetch(`${API_URL}/api/groups`, {
+        const res = await fetch(`${API_BASE}/api/groups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -56,7 +56,7 @@ export const groupApi = {
     getUserGroupsBackend: async (
     userId: number,
     ): Promise<BackendGroupForUser[]> => {
-        const res = await fetch(`${API_URL}/api/groups-by-user/${userId}`)
+        const res = await fetch(`${API_BASE}/api/groups-by-user/${userId}`)
 
         const data = await res.json().catch(() => null)
 
@@ -112,7 +112,7 @@ export const groupApi = {
 
     // Gauti kategorijas (globalias, nes nėra per grupę)
     async getCategories(): Promise<Category[]> {
-    const response = await fetch(`${API_URL}/api/categories`);
+    const response = await fetch(`${API_BASE}/api/categories`);
     if (!response.ok) {
       throw new Error('Nepavyko gauti kategorijų');
     }
@@ -144,7 +144,7 @@ export const groupApi = {
         lateFeeAmount?: number;
         lateFeeAfterDays?: number;
     }) {
-        const response = await fetch(`${API_URL}/api/debts`, {
+        const response = await fetch(`${API_BASE}/api/debts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -160,7 +160,7 @@ export const groupApi = {
     
     // Gauti visas grupės skolas
     async getDebtsByGroup(groupId: number) {
-        const res = await fetch(`${API_URL}/api/debts-by-group/${groupId}`)
+        const res = await fetch(`${API_BASE}/api/debts-by-group/${groupId}`)
         if (!res.ok) {
             const err = await res.json().catch(() => ({}))
             throw new Error(err.message || "Nepavyko gauti skolų")
