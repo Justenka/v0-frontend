@@ -50,47 +50,46 @@ export default function LoginPage() {
 
   return (
         <>
-      {/* Google Identity script */}
       <Script
-        src="https://accounts.google.com/gsi/client"
-        async
-        defer
-        onLoad={() => {
-          const google = (window as any).google
-          if (!google?.accounts?.id) return
+      src="https://accounts.google.com/gsi/client"
+      async
+      defer
+      strategy="afterInteractive"
+      onReady={() => {
+        const google = (window as any).google
+        if (!google?.accounts?.id) return
 
-          google.accounts.id.initialize({
-            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-            callback: async (response: any) => {
-              try {
-                setError("")
-                setIsLoading(true)
+        google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+          callback: async (response: any) => {
+            try {
+              setError("")
+              setIsLoading(true)
 
-                const idToken = response.credential
-                await loginWithGoogle(idToken)
+              const idToken = response.credential
+              await loginWithGoogle(idToken)
 
-                router.push("/")
-              } catch (err: any) {
-                console.error(err)
-                setError(
-                  err?.message || "Prisijungimas per Google nepavyko"
-                )
-              } finally {
-                setIsLoading(false)
-              }
-            },
-          })
+              router.push("/")
+            } catch (err: any) {
+              console.error(err)
+              setError(err?.message || "Prisijungimas per Google nepavyko")
+            } finally {
+              setIsLoading(false)
+            }
+          },
+        })
 
-          const buttonContainer = document.getElementById("googleSignInDiv")
-          if (buttonContainer) {
-            google.accounts.id.renderButton(buttonContainer, {
-              theme: "outline",
-              size: "large",
-              width: "100",
-            } as any)
-          }
-        }}
+        const buttonContainer = document.getElementById("googleSignInDiv")
+        if (buttonContainer && !buttonContainer.hasChildNodes()) {
+          google.accounts.id.renderButton(buttonContainer, {
+            theme: "outline",
+            size: "large",
+            width: 100,
+          } as any)
+        }
+      }}
       />
+
 
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">

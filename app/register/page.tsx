@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Script from "next/script"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -48,7 +49,7 @@ export default function RegisterPage() {
     }
   }
 
-  const handleGoogleLogin = async () => {
+  /*const handleGoogleLogin = async () => {
     setIsLoading(true)
     try {
       await loginWithGoogle()
@@ -58,9 +59,53 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }*/
 
   return (
+    <>
+      {/* Google Identity script */}
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        async
+        defer
+        strategy="afterInteractive"
+        onReady={() => {
+          const google = (window as any).google
+          if (!google?.accounts?.id) return
+
+          google.accounts.id.initialize({
+            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+            callback: async (response: any) => {
+              try {
+                setError("")
+                setIsLoading(true)
+
+                const idToken = response.credential
+                // Same function as in LoginPage
+                await loginWithGoogle(idToken)
+
+                router.push("/")
+              } catch (err: any) {
+                console.error(err)
+                setError(
+                  err?.message || "Registracija per Google nepavyko"
+                )
+              } finally {
+                setIsLoading(false)
+              }
+            },
+          })
+
+          const buttonContainer = document.getElementById("googleRegisterDiv")
+          if (buttonContainer && !buttonContainer.hasChildNodes()) {
+            google.accounts.id.renderButton(buttonContainer, {
+              theme: "outline",
+              size: "large",
+              width: 100,
+            } as any)
+          }
+        }}
+      />
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
@@ -130,10 +175,11 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full bg-transparent" onClick={handleGoogleLogin} disabled={isLoading}>
+          {/*<Button variant="outline" className="w-full bg-transparent" onClick={handleGoogleLogin} disabled={isLoading}>
             <Chrome className="mr-2 h-4 w-4" />
             Registruotis su Google
-          </Button>
+          </Button>*/}
+          <div id="googleRegisterDiv" className="flex justify-center" />
         </CardContent>
         <CardFooter>
           <div className="text-sm text-center text-gray-600 w-full">
@@ -145,5 +191,6 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
+    </>
   )
 }
