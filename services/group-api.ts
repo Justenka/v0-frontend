@@ -10,6 +10,7 @@ import {
   settleUp,
   deleteMockGroup,
 } from "@/lib/mock-data"
+import { UserRole } from "@/types/user";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
@@ -185,4 +186,22 @@ export const groupApi = {
 
         return res.json()
     },
+
+    async getUserRoleInGroup(groupId: number, userId: number): Promise<UserRole> {
+    const res = await fetch(`${API_BASE}/api/grupes/${groupId}/nariai/${userId}/role`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    })
+   
+    if (!res.ok) {
+      throw new Error("Nepavyko gauti vartotojo rolės")
+    }
+     
+    const data = await res.json()
+    console.log(data.roleText);
+    return data.roleText as UserRole
+  },
+
+
+
 }

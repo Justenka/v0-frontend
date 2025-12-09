@@ -42,6 +42,7 @@ export default function GroupPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState<UserRole>("guest") // Pridėkite naują state
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -52,16 +53,6 @@ export default function GroupPage() {
     }
   }, [isLoading, user, router])
 
-  // Gauname user rolę iš backend'o (group.role)
-  const userRole: UserRole =
-    typeof group?.role === "string"
-      ? group.role
-      : group?.role === 3
-      ? "guest"
-      : group?.role === 2
-      ? "member"
-      : "admin"
-  console.log("User role:", group?.role)
   // Mapinam narius settings dialogui
   // Kol kas naudojame placeholder email ir role, vėliau reikės gauti iš backend'o
   const groupMembers = members.map((member) => ({
@@ -96,6 +87,17 @@ export default function GroupPage() {
         }
 
         const userId = Number(user.id)
+        console.log("User role:", user.id)
+        try {
+          const role = await groupApi.getUserRoleInGroup(groupId, userId)
+          setUserRole(role)
+          console.log("User role in group:", role)
+        } catch (error) {
+          console.error("Nepavyko gauti vartotojo rolės:", error)
+          setUserRole("guest") // Default į guest jei klaida
+        }
+         
+
         const backendGroups: BackendGroupForUser[] = await groupApi.getUserGroupsBackend(userId)
 
         const backendGroup = backendGroups.find((g) => g.id_grupe === groupId)
