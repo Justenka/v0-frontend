@@ -26,7 +26,7 @@ export interface Group {
   title: string
   description?: string | null
   createdAt?: string | Date
-
+  pavadinimas?: string | null
   // Owner informacija
   ownerId?: number
   ownerFirstName?: string

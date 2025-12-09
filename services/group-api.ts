@@ -170,7 +170,7 @@ export const groupApi = {
 
     // Ištrinti skolą (išlaidą)
     async deleteDebt(debtId: number, userId: number): Promise<void> {
-        const res = await fetch(`${API_URL}/api/debts/${debtId}?userId=${userId}`, {
+        const res = await fetch(`${API_BASE}/api/debts/${debtId}?userId=${userId}`, {
             method: 'DELETE',
             headers: { 
                 'Content-Type': 'application/json',

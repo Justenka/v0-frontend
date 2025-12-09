@@ -1,5 +1,5 @@
 "use client"
-
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,8 +8,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
+
+// Tipai pagal tavo DB
+type Valiuta = {
+  id_valiuta: number
+  name: string
+}
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -23,39 +36,78 @@ export default function SettingsPage() {
   const [paymentReminders, setPaymentReminders] = useState(true)
   const [messages, setMessages] = useState(true)
 
-  // ✅ Redirect if not logged in
+// Valiutų būsena
+  const [valiutos, setValiutos] = useState<Valiuta[]>([])
+  const [selectedValiuta, setSelectedValiuta] = useState<string>("")
+  const [isSaving, setIsSaving] = useState(false)
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
   }, [isLoading, user, router])
 
+// Užkrauname valiutas ir vartotojo pasirinkimą
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return
+
+      try {
+        // 1. Užkrauname visas valiutas
+        const valResp = await fetch(`${API_BASE}/api/valiutos`)
+        const valData = await valResp.json()
+        setValiutos(valData)
+
+        // 2. Užkrauname vartotojo dabartinę valiutą
+        const userResp = await fetch(`${API_BASE}/api/vartotojai/${user.id}`)
+        const userData = await userResp.json()
+
+        // userData.valiutos_kodas yra id_valiuta (pvz. 1, 2, 3)
+        setSelectedValiuta(String(userData.valiutos_kodas))
+      } catch (err) {
+        console.error(err)
+        toast.error("Nepavyko užkrauti nustatymų")
+      }
+    }
+
+    if (!isLoading && user) {
+      void fetchData()
+    }
+  }, [isLoading, user])
+
+  // Išsaugojimo funkcija – tik valiutai (kol kas)
+  const handleSave = async () => {
+    if (!user) return
+
+    setIsSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/vartotojai/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          valiutos_kodas: Number(selectedValiuta),
+        }),
+      })
+
+      if (!res.ok) throw new Error("Nepavyko išsaugoti")
+
+      toast.success("Nustatymai išsaugoti")
+    } catch (err) {
+      toast.error("Klaida saugant valiutą")
+      console.error(err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Loading būsena – rodomas centruotas tekstas, kaip ir kitur
   if (isLoading) {
     return <div className="text-center py-20 text-gray-500">Kraunama...</div>
   }
 
+  // Jei vartotojas neautentifikuotas – grąžiname null (router jau nukreipė, bet saugumui)
   if (!user) {
     return null
-  }
-
-  const handleSaveNotifications = () => {
-    // Mock: Save notification settings
-    toast.success("Pranešimų nustatymai išsaugoti")
-
-    // Real implementation:
-    /*
-    await supabase
-      .from('user_settings')
-      .upsert({
-        user_id: user.id,
-        email_notifications: emailNotifications,
-        push_notifications: pushNotifications,
-        notify_group_invites: groupInvites,
-        notify_new_expenses: newExpenses,
-        notify_payment_reminders: paymentReminders,
-        notify_messages: messages
-      })
-    */
   }
 
   return (
@@ -63,7 +115,35 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-8">Nustatymai</h1>
 
       <div className="space-y-6">
-        {/* Notification Settings */}
+        {/* Valiutos pasirinkimas */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagrindinė valiuta</CardTitle>
+            <CardDescription>
+              Pasirinkite, kokia valiuta bus naudojama visoje programoje
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Label className="w-32">Valiuta</Label>
+                <Select value={selectedValiuta} onValueChange={setSelectedValiuta}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Pasirinkite valiutą" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {valiutos.map((v) => (
+                      <SelectItem key={v.id_valiuta} value={String(v.id_valiuta)}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {/* Pranešimų nustatymai (paliekame kaip dekoraciją kol kas) */}
         <Card>
           <CardHeader>
             <CardTitle>Pranešimų nustatymai</CardTitle>
@@ -128,7 +208,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <Button onClick={handleSaveNotifications}>Išsaugoti nustatymus</Button>
+            <Button onClick={handleSave}>Išsaugoti nustatymus</Button>
           </CardContent>
         </Card>
       </div>
