@@ -98,10 +98,35 @@ async function changePassword(
   return res.json()
 }
 
+async function uploadAvatar(
+  file: File,
+  userId: number | string,
+): Promise<{ user: BackendUser }> {
+  const formData = new FormData()
+  formData.append("avatar", file)
+
+  const res = await fetch(`${API_BASE}/api/profile/avatar`, {
+    method: "POST",
+    headers: {
+      "x-user-id": String(userId),
+      // !!! NEdedam Content-Type čia – browseris pats uždės multipart boundary
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}))
+    throw new Error(errData.message || "Nepavyko įkelti avataro")
+  }
+
+  return res.json()
+}
+
 export const authApi = {
   login,
   register,
   loginWithGoogle,
   updateProfile,
   changePassword,
+  uploadAvatar,
 }

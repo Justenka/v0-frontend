@@ -4,7 +4,7 @@ export interface User {
   id: string
   name: string
   email: string
-  avatar?: string
+  avatar?: string | null
   createdAt: Date
   lastLoginAt: Date     
   friends: string[]

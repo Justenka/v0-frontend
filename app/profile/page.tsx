@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +15,7 @@ import { toast } from "sonner"
 import { authApi } from "@/services/auth-api"
 
 export default function ProfilePage() {
-  const { user, isLoading, updateProfile } = useAuth()
+  const { user, isLoading, updateProfile, uploadAvatar } = useAuth()
   const router = useRouter()
 
   const [name, setName] = useState(user?.name || "")
@@ -23,14 +24,17 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
-  // ✅ Redirect if not logged in
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
+  // Redirect if not logged in
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
   }, [isLoading, user, router])
 
-  // ✅ Populate fields when user loads
+  // Populate fields when user loads
   useEffect(() => {
     if (user) {
       setName(user.name || "")
@@ -85,6 +89,27 @@ export default function ProfilePage() {
       .join("")
       .toUpperCase()
   }
+  const handleAvatarButtonClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setIsUploading(true)
+      await uploadAvatar(file)
+      toast.success("Nuotrauka atnaujinta")
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Nepavyko atnaujinti nuotraukos")
+    } finally {
+      setIsUploading(false)
+      // kad po to patį tą patį failą galėtum vėl pasirinkt
+      e.target.value = ""
+    }
+  }
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
@@ -107,12 +132,24 @@ export default function ProfilePage() {
               <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
                   <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                  <AvatarFallback className="text-2xl">{getInitials(user.name)}</AvatarFallback>
+                  <AvatarFallback className="text-2xl">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
                 </Avatar>
-                <Button variant="outline">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Keisti nuotrauką
-                </Button>
+
+                <div className="space-y-2">
+                  <Button variant="outline" onClick={handleAvatarButtonClick} disabled={isUploading}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    {isUploading ? "Keliama..." : "Keisti nuotrauką"}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">

@@ -7,8 +7,9 @@ export interface BackendUser {
   pavarde: string
   el_pastas: string
   valiutos_kodas: number
-  sukurimo_data: string              // ateina kaip string iš JSON
-  paskutinis_prisijungimas: string
+  sukurimo_data: string             
+  paskutinis_prisijungimas: string | null
+  avatar_url?: string | null
 }
 
 export interface BackendGroupForUser {

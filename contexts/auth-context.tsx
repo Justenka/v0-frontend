@@ -14,6 +14,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   updateProfile: (updates: Partial<User>) => Promise<void>
+  uploadAvatar: (file: File) => Promise<void>
   isLoading: boolean
 }
 
@@ -44,25 +45,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Helper: map backend user -> AuthUser shape
   function mapBackendUserToAuthUser(backendUser: BackendUser): AuthUser {
-  const createdAt = backendUser.sukurimo_data
-    ? new Date(backendUser.sukurimo_data)
-    : new Date()
+    const createdAt = backendUser.sukurimo_data
+      ? new Date(backendUser.sukurimo_data)
+      : new Date()
 
-  const lastLoginAt = backendUser.paskutinis_prisijungimas
-    ? new Date(backendUser.paskutinis_prisijungimas)
-    : createdAt
+    const lastLoginAt = backendUser.paskutinis_prisijungimas
+      ? new Date(backendUser.paskutinis_prisijungimas)
+      : createdAt
 
-  return {
-    id: backendUser.id_vartotojas.toString(),
-    name: `${backendUser.vardas} ${backendUser.pavarde}`,
-    email: backendUser.el_pastas,
-    avatar: undefined,
-    createdAt,
-    lastLoginAt,
-    friends: [],
-    isAuthenticated: true,
+    return {
+      id: backendUser.id_vartotojas.toString(),
+      name: `${backendUser.vardas} ${backendUser.pavarde}`,
+      email: backendUser.el_pastas,
+      avatar: backendUser.avatar_url || undefined,
+      createdAt,
+      lastLoginAt,
+      friends: [],
+      isAuthenticated: true,
+    }
   }
-}
 
   const login = async (email: string, password: string) => {
     try {
@@ -97,7 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw err
     }
   }
-
 
   const register = async (name: string, email: string, password: string) => {
     try {
@@ -148,6 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const uploadAvatar = async (file: File) => {
+    if (!user) return
+
+    try {
+      const { user: backendUser } = await authApi.uploadAvatar(file, Number(user.id))
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("uploadAvatar failed:", err)
+      throw err
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -157,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         updateProfile,
+        uploadAvatar,
         isLoading,
       }}
     >
