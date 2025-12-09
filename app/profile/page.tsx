@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/contexts/auth-context"
 import { Camera, Save, Lock } from "lucide-react"
 import { toast } from "sonner"
+import { authApi } from "@/services/auth-api"
 
 export default function ProfilePage() {
   const { user, isLoading, updateProfile } = useAuth()
@@ -45,7 +46,6 @@ export default function ProfilePage() {
     return null
   }
 
-  // ✅ Save profile using AuthContext
   const handleSaveProfile = async () => {
     try {
       await updateProfile({ name, email })
@@ -55,17 +55,27 @@ export default function ProfilePage() {
     }
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast.error("Slaptažodžiai nesutampa")
       return
     }
 
-    // Mock change
-    toast.success("Slaptažodis pakeistas!")
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
+    if (!currentPassword || !newPassword) {
+      toast.error("Užpildykite visus laukus")
+      return
+    }
+
+    try {
+      await authApi.changePassword(currentPassword, newPassword, user.id)
+      toast.success("Slaptažodis pakeistas!")
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Nepavyko pakeisti slaptažodžio")
+    }
   }
 
   const getInitials = (name: string) => {

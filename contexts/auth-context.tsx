@@ -1,9 +1,9 @@
+// contexts/auth-context.tsx
 "use client"
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
-import { mockUsers } from "@/lib/mock-data"
 import { authApi} from "@/services/auth-api"
 import type { BackendUser } from "@/types/backend"
 
@@ -44,17 +44,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Helper: map backend user -> AuthUser shape
   function mapBackendUserToAuthUser(backendUser: BackendUser): AuthUser {
-    return {
-      id: backendUser.id_vartotojas.toString(),
-      name: `${backendUser.vardas} ${backendUser.pavarde}`,
-      email: backendUser.el_pastas,
-      avatar: undefined, // kol kas neturim
-      createdAt: new Date(backendUser.sukurimo_data), // iš DATE/string → Date
-      lastLoginAt: new Date(backendUser.paskutinis_prisijungimas),
-      friends: [], // backend kol kas neteikia
-      isAuthenticated: true,
-    }
+  const createdAt = backendUser.sukurimo_data
+    ? new Date(backendUser.sukurimo_data)
+    : new Date()
+
+  const lastLoginAt = backendUser.paskutinis_prisijungimas
+    ? new Date(backendUser.paskutinis_prisijungimas)
+    : createdAt
+
+  return {
+    id: backendUser.id_vartotojas.toString(),
+    name: `${backendUser.vardas} ${backendUser.pavarde}`,
+    email: backendUser.el_pastas,
+    avatar: undefined,
+    createdAt,
+    lastLoginAt,
+    friends: [],
+    isAuthenticated: true,
   }
+}
 
   const login = async (email: string, password: string) => {
     try {
@@ -119,9 +127,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return
 
-    const updatedUser = { ...user, ...updates }
-    setUser(updatedUser)
-    localStorage.setItem("auth_user", JSON.stringify(updatedUser))
+    // ką siunčiam į backend – tik vardas + email
+    const payload = {
+      name: updates.name ?? user.name,
+      email: updates.email ?? user.email,
+    }
+
+    try {
+      const { user: backendUser } = await authApi.updateProfile(
+        payload,
+        Number(user.id), // mūsų authUser.id = id_vartotojas string formatu
+      )
+
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("updateProfile failed:", err)
+      throw err
+    }
   }
 
   return (

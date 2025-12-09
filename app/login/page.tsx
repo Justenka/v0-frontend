@@ -35,19 +35,6 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 }
-
-  /*const handleGoogleLogin = async () => {
-    setIsLoading(true)
-    try {
-      await loginWithGoogle()
-      router.push("/")
-    } catch (err) {
-      setError("Failed to login with Google")
-    } finally {
-      setIsLoading(false)
-    }
-  }*/
-
   return (
         <>
       <Script
