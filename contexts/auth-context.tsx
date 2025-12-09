@@ -27,20 +27,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const storedUser =
     typeof window !== "undefined" ? localStorage.getItem("auth_user") : null
 
-  if (storedUser) {
-    const parsed = JSON.parse(storedUser) as AuthUser
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser) as AuthUser
 
-    if (parsed.createdAt) {
-      parsed.createdAt = new Date(parsed.createdAt)
-    }
-    if (parsed.lastLoginAt) {
-      parsed.lastLoginAt = new Date(parsed.lastLoginAt)
-    }
+      if (parsed.createdAt) {
+        parsed.createdAt = new Date(parsed.createdAt)
+      }
+      if (parsed.lastLoginAt) {
+        parsed.lastLoginAt = new Date(parsed.lastLoginAt)
+      }
 
-    setUser(parsed)
-  }
-  setIsLoading(false)
-}, [])
+      setUser(parsed)
+    }
+    setIsLoading(false)
+  }, [])
 
   // Helper: map backend user -> AuthUser shape
   function mapBackendUserToAuthUser(backendUser: BackendUser): AuthUser {
@@ -57,67 +57,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
-  try {
-    const { user: backendUser } = await authApi.login(email, password)
+    try {
+      const { user: backendUser } = await authApi.login(email, password)
 
-    const authUser = mapBackendUserToAuthUser(backendUser)
-    setUser(authUser)
-    localStorage.setItem("auth_user", JSON.stringify(authUser))
-  } catch (err) {
-    setUser(null)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_user")
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      setUser(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_user")
+      }
+      console.error("Login failed:", err)
+      throw err
     }
-    console.error("Login failed:", err)
-    throw err
   }
-}
 
-  /*const loginWithGoogle = async () => {
-    // kol kas vis dar mock
-    const mockUser: AuthUser = {
-      ...mockUsers[0], // Alex
-      isAuthenticated: true,
+  const loginWithGoogle = async (idToken: string) => {
+    try {
+      const { user: backendUser } = await authApi.loginWithGoogle(idToken)
+
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("Google login failed:", err)
+      setUser(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_user")
+      }
+      throw err
     }
-    setUser(mockUser)
-    localStorage.setItem("auth_user", JSON.stringify(mockUser))
-  }*/
-
-    const loginWithGoogle = async (idToken: string) => {
-  try {
-    const { user: backendUser } = await authApi.loginWithGoogle(idToken)
-
-    const authUser = mapBackendUserToAuthUser(backendUser)
-    setUser(authUser)
-    localStorage.setItem("auth_user", JSON.stringify(authUser))
-  } catch (err) {
-    console.error("Google login failed:", err)
-    setUser(null)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_user")
-    }
-    throw err
   }
-}
 
 
   const register = async (name: string, email: string, password: string) => {
-  try {
-    const { user: backendUser } = await authApi.register(name, email, password)
+    try {
+      const { user: backendUser } = await authApi.register(name, email, password)
 
-    const authUser = mapBackendUserToAuthUser(backendUser)
-    setUser(authUser)
-    localStorage.setItem("auth_user", JSON.stringify(authUser))
-  } catch (err) {
-    console.error("Register failed:", err)
-    // jei nepavyko – išvalom userį, kad nebūtų half-state
-    setUser(null)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_user")
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("Register failed:", err)
+      // jei nepavyko – išvalom userį, kad nebūtų half-state
+      setUser(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_user")
+      }
+      throw err
     }
-    throw err
   }
-}
+
   const logout = () => {
     setUser(null)
     if (typeof window !== "undefined") {
