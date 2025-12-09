@@ -1,7 +1,6 @@
 "use client"
 
-import { useRef } from "react"
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,8 +23,12 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
+  // avatar preview + pending file
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar ?? null)
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null)
+
+  const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -34,11 +37,13 @@ export default function ProfilePage() {
     }
   }, [isLoading, user, router])
 
-  // Populate fields when user loads
+  // Populate fields when user loads/atnaujinamas
   useEffect(() => {
     if (user) {
       setName(user.name || "")
       setEmail(user.email || "")
+      setAvatarPreview(user.avatar ?? null)
+      setPendingAvatarFile(null)
     }
   }, [user])
 
@@ -50,12 +55,30 @@ export default function ProfilePage() {
     return null
   }
 
+  // Išsaugom profilį (vardas + email + jei reikia avatarą)
   const handleSaveProfile = async () => {
     try {
-      await updateProfile({ name, email })
+      setIsSaving(true)
+
+      const tasks: Promise<unknown>[] = []
+
+      // profilio duomenys
+      tasks.push(updateProfile({ name, email }))
+
+      // jei pasirinkta nauja nuotrauka – keliam ją
+      if (pendingAvatarFile) {
+        tasks.push(uploadAvatar(pendingAvatarFile))
+      }
+
+      await Promise.all(tasks)
+
+      setPendingAvatarFile(null)
       toast.success("Profilis atnaujintas")
     } catch (error) {
+      console.error(error)
       toast.error("Nepavyko atnaujinti profilio")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -85,30 +108,26 @@ export default function ProfilePage() {
   const getInitials = (name: string) => {
     return name
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
   }
+
   const handleAvatarButtonClick = () => {
     fileInputRef.current?.click()
   }
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // tik pakeičiam preview + užsidedam file į state, nesiunčiam į backend
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    try {
-      setIsUploading(true)
-      await uploadAvatar(file)
-      toast.success("Nuotrauka atnaujinta")
-    } catch (err: any) {
-      console.error(err)
-      toast.error(err.message || "Nepavyko atnaujinti nuotraukos")
-    } finally {
-      setIsUploading(false)
-      // kad po to patį tą patį failą galėtum vėl pasirinkt
-      e.target.value = ""
-    }
+    setPendingAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+
+    // kad būtų galima vėl pasirinkt tą patį failą
+    e.target.value = ""
   }
 
   return (
@@ -131,16 +150,23 @@ export default function ProfilePage() {
             <CardContent className="space-y-6">
               <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                  <AvatarImage
+                    src={avatarPreview || "/placeholder.svg"}
+                    alt={user.name}
+                  />
                   <AvatarFallback className="text-2xl">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="space-y-2">
-                  <Button variant="outline" onClick={handleAvatarButtonClick} disabled={isUploading}>
+                  <Button
+                    variant="outline"
+                    onClick={handleAvatarButtonClick}
+                    disabled={isSaving}
+                  >
                     <Camera className="h-4 w-4 mr-2" />
-                    {isUploading ? "Keliama..." : "Keisti nuotrauką"}
+                    {pendingAvatarFile ? "Pasirinkta nauja nuotrauka" : "Keisti nuotrauką"}
                   </Button>
                   <input
                     ref={fileInputRef}
@@ -149,13 +175,23 @@ export default function ProfilePage() {
                     className="hidden"
                     onChange={handleAvatarChange}
                   />
+                  {pendingAvatarFile && (
+                    <p className="text-xs text-muted-foreground">
+                      Nauja nuotrauka bus išsaugota paspaudus „Išsaugoti pakeitimus“.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Vardas</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jūsų vardas" />
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Jūsų vardas"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -169,9 +205,9 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <Button onClick={handleSaveProfile}>
+                <Button onClick={handleSaveProfile} disabled={isSaving}>
                   <Save className="h-4 w-4 mr-2" />
-                  Išsaugoti pakeitimus
+                  {isSaving ? "Saugoma..." : "Išsaugoti pakeitimus"}
                 </Button>
               </div>
             </CardContent>

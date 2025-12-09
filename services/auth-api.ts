@@ -1,7 +1,7 @@
 // services/auth-api.ts
 import type { BackendUser } from "@/types/backend"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
 // --- LOGIN ---
 async function login(email: string, password: string): Promise<{ user: BackendUser }> {

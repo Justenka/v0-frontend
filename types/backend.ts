@@ -1,6 +1,5 @@
 // types/backend.ts
 
-// Kaip useris atrodo BŪTENT iš backend /api/login atsakymo
 export interface BackendUser {
   id_vartotojas: number
   vardas: string

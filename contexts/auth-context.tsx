@@ -4,7 +4,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
-import { authApi} from "@/services/auth-api"
+import { API_BASE, authApi} from "@/services/auth-api"
 import type { BackendUser } from "@/types/backend"
 
 interface AuthContextType {
@@ -53,11 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? new Date(backendUser.paskutinis_prisijungimas)
       : createdAt
 
+    const avatar = backendUser.avatar_url
+      ? `${API_BASE}${backendUser.avatar_url}`
+      : undefined
+
     return {
       id: backendUser.id_vartotojas.toString(),
       name: `${backendUser.vardas} ${backendUser.pavarde}`,
       email: backendUser.el_pastas,
-      avatar: backendUser.avatar_url || undefined,
+      avatar,
       createdAt,
       lastLoginAt,
       friends: [],
