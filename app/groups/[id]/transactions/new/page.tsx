@@ -19,7 +19,7 @@ import type { Category } from "@/types/category"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import { Stepper, StepContent } from "@/components/ui/stepper"
-import { supportedCurrencies } from "@/lib/currency-api"
+import { getSupportedCurrencies, type Currency } from "@/lib/currency-api"
 
 export default function NaujaIslaidaPuslapis() {
   const params = useParams()
@@ -40,29 +40,49 @@ export default function NaujaIslaidaPuslapis() {
 
   const [categoryId, setCategoryId] = useState<string>("")
   const [categories, setCategories] = useState<Category[]>([])
+  const [supportedCurrencies, setSupportedCurrencies] = useState<Currency[]>([])
+  const [loadingCurrencies, setLoadingCurrencies] = useState(true)
 
   const [currentStep, setCurrentStep] = useState(0)
   const steps = ["Duomenys", "Kas mokėjo", "Dalinimas", "Peržiūra"]
 
   useEffect(() => {
-  if (!isLoading && !user) {
-    router.push("/login")
-  }
-}, [isLoading, user, router])
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [isLoading, user, router])
 
- useEffect(() => {
+  // Load currencies from database
+  useEffect(() => {
+    const loadCurrencies = async () => {
+      try {
+        setLoadingCurrencies(true)
+        const currencies = await getSupportedCurrencies()
+        setSupportedCurrencies(currencies)
+      } catch (error) {
+        console.error("Error loading currencies:", error)
+        toast.error("Nepavyko įkelti valiutų")
+      } finally {
+        setLoadingCurrencies(false)
+      }
+    }
+
+    loadCurrencies()
+  }, [])
+
+  useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await groupApi.getCategories();  // NAUJAS: globalu
-        setCategories(data);
+        const data = await groupApi.getCategories()
+        setCategories(data)
       } catch (error) {
-        console.error("Nepavyko įkelti kategorijų:", error);
-        toast.error("Nepavyko įkelti kategorijų");
+        console.error("Nepavyko įkelti kategorijų:", error)
+        toast.error("Nepavyko įkelti kategorijų")
       }
-    };
+    }
 
-    fetchCategories();
-  }, []);
+    fetchCategories()
+  }, [])
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -116,70 +136,68 @@ export default function NaujaIslaidaPuslapis() {
     }
   }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-  if (currentStep < steps.length - 1) {
-    goToNextStep();
-    return;
-  }
-
-  if (!title.trim() || !amount || !paidBy || !user?.name) {
-    toast.error("Užpildykite visus privalomus laukus");
-    return;
-  }
-
-  setIsSubmitting(true);
-
-  try {
-    // Raskome paidByUserId pagal vardą
-    const paidByMember = members.find(m => m.name === paidBy);
-    if (!paidByMember) throw new Error("Nerastas mokėtojas");
-
-    // Suskaičiuojame splits pagal pasirinktą tipą
-    let splits: { userId: number; amount?: number; percentage?: number }[] = [];
-
-    if (splitType === "equal") {
-      const perPerson = Number.parseFloat(amount) / members.length;
-      splits = members.map(m => ({
-        userId: Number(m.id),
-        amount: perPerson
-      }));
-    } else if (splitType === "percentage") {
-      splits = members.map(m => ({
-        userId: Number(m.id),
-        percentage: Number.parseFloat(percentages[m.id] || "0")
-      }));
-    } else if (splitType === "dynamic") {
-      splits = members.map(m => ({
-        userId: Number(m.id),
-        amount: Number.parseFloat(amounts[m.id] || "0")
-      }));
+    if (currentStep < steps.length - 1) {
+      goToNextStep()
+      return
     }
 
-    await groupApi.createDebt({
-      groupId,
-      title,
-      description: "", // galima pridėti lauką jei nori
-      amount: Number.parseFloat(amount),
-      currencyCode: currency,
-      paidByUserId: Number(paidByMember.id),
-      categoryId: categoryId || undefined,
-      splitType: splitType as "equal" | "percentage" | "dynamic",
-      splits,
-      lateFeeAmount: enableLateFee && lateFeeAmount ? Number.parseFloat(lateFeeAmount) : undefined,
-      lateFeeAfterDays: enableLateFee ? Number(lateFeeDays) : undefined,
-    });
+    if (!title.trim() || !amount || !paidBy || !user?.name) {
+      toast.error("Užpildykite visus privalomus laukus")
+      return
+    }
 
-    toast.success("Išlaida sėkmingai pridėta!");
-    router.push(`/groups/${groupId}`);
-  } catch (error: any) {
-    console.error("Klaida kuriant išlaidą:", error);
-    toast.error(error.message || "Nepavyko pridėti išlaidos");
-  } finally {
-    setIsSubmitting(false);
+    setIsSubmitting(true)
+
+    try {
+      const paidByMember = members.find(m => m.name === paidBy)
+      if (!paidByMember) throw new Error("Nerastas mokėtojas")
+
+      let splits: { userId: number; amount?: number; percentage?: number }[] = []
+
+      if (splitType === "equal") {
+        const perPerson = Number.parseFloat(amount) / members.length
+        splits = members.map(m => ({
+          userId: Number(m.id),
+          amount: perPerson
+        }))
+      } else if (splitType === "percentage") {
+        splits = members.map(m => ({
+          userId: Number(m.id),
+          percentage: Number.parseFloat(percentages[m.id] || "0")
+        }))
+      } else if (splitType === "dynamic") {
+        splits = members.map(m => ({
+          userId: Number(m.id),
+          amount: Number.parseFloat(amounts[m.id] || "0")
+        }))
+      }
+
+      await groupApi.createDebt({
+        groupId,
+        title,
+        description: "",
+        amount: Number.parseFloat(amount),
+        currencyCode: currency,
+        paidByUserId: Number(paidByMember.id),
+        categoryId: categoryId || undefined,
+        splitType: splitType as "equal" | "percentage" | "dynamic",
+        splits,
+        lateFeeAmount: enableLateFee && lateFeeAmount ? Number.parseFloat(lateFeeAmount) : undefined,
+        lateFeeAfterDays: enableLateFee ? Number(lateFeeDays) : undefined,
+      })
+
+      toast.success("Išlaida sėkmingai pridėta!")
+      router.push(`/groups/${groupId}`)
+    } catch (error: any) {
+      console.error("Klaida kuriant išlaidą:", error)
+      toast.error(error.message || "Nepavyko pridėti išlaidos")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
-}
 
   const handlePercentageChange = (memberId: number, value: string) => {
     setPercentages({ ...percentages, [memberId]: value })
@@ -189,17 +207,17 @@ const handleSubmit = async (e: React.FormEvent) => {
     setAmounts({ ...amounts, [memberId]: value })
   }
 
-const isPercentageValid = () => {
-  if (splitType !== "percentage") return true
-  const total = Object.values(percentages).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
-  return Math.abs(total - 100) < 0.01
-}
+  const isPercentageValid = () => {
+    if (splitType !== "percentage") return true
+    const total = Object.values(percentages).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
+    return Math.abs(total - 100) < 0.01
+  }
 
-const isDynamicValid = () => {
-  if (splitType !== "dynamic") return true
-  const totalSplit = Object.values(amounts).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
-  return Math.abs(totalSplit - Number.parseFloat(amount || "0")) < 0.01
-}
+  const isDynamicValid = () => {
+    if (splitType !== "dynamic") return true
+    const totalSplit = Object.values(amounts).reduce((sum, val) => sum + Number.parseFloat(val || "0"), 0)
+    return Math.abs(totalSplit - Number.parseFloat(amount || "0")) < 0.01
+  }
 
   const calculateSplitAmounts = () => {
     if (!amount || isNaN(Number.parseFloat(amount))) return []
@@ -278,7 +296,7 @@ const isDynamicValid = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Valiuta</Label>
-                    <Select value={currency} onValueChange={setCurrency}>
+                    <Select value={currency} onValueChange={setCurrency} disabled={loadingCurrencies}>
                       <SelectTrigger id="currency" className="w-[100px]">
                         <SelectValue />
                       </SelectTrigger>
@@ -292,8 +310,6 @@ const isDynamicValid = () => {
                     </Select>
                   </div>
                 </div>
-
-
 
                 <div className="border-t pt-4 space-y-4">
                   <div className="flex items-center space-x-2">
@@ -454,7 +470,6 @@ const isDynamicValid = () => {
                       ))}
                     </div>
 
-                    {/* Rodoma bendra suma */}
                     <div className="mt-4 p-4 bg-muted rounded-md flex justify-between">
                       <p className="font-medium">
                         Iš viso:{" "}
@@ -571,8 +586,6 @@ const isDynamicValid = () => {
           </CardFooter>
         </form>
       </Card>
-
-
     </div>
   )
 }

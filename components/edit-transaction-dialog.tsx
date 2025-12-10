@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Transaction } from "@/types/transaction"
 import type { Member } from "@/types/member"
 import { toast } from "sonner"
-import { supportedCurrencies } from "@/lib/currency-api"
+import { getSupportedCurrencies, type Currency } from "@/lib/currency-api"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -40,7 +40,6 @@ export function EditTransactionDialog({
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState("")
-  // const [description, setDescription] = useState("")
   const [amount, setAmount] = useState("")
   const [paidByUserId, setPaidByUserId] = useState("")
   const [splitType, setSplitType] = useState<"equal" | "percentage" | "custom">("equal")
@@ -48,6 +47,26 @@ export function EditTransactionDialog({
   const [categoryId, setCategoryId] = useState("")
   const [splits, setSplits] = useState<{ userId: number; amount: number; percentage: number }[]>([])
   const [fullDebtData, setFullDebtData] = useState<any>(null)
+  const [supportedCurrencies, setSupportedCurrencies] = useState<Currency[]>([])
+  const [loadingCurrencies, setLoadingCurrencies] = useState(true)
+
+  // Load currencies
+  useEffect(() => {
+    const loadCurrencies = async () => {
+      try {
+        setLoadingCurrencies(true)
+        const currencies = await getSupportedCurrencies()
+        setSupportedCurrencies(currencies)
+      } catch (error) {
+        console.error("Error loading currencies:", error)
+        toast.error("Nepavyko įkelti valiutų")
+      } finally {
+        setLoadingCurrencies(false)
+      }
+    }
+
+    loadCurrencies()
+  }, [])
 
   useEffect(() => {
     if (transaction && open) {
@@ -141,7 +160,6 @@ export function EditTransactionDialog({
 
       await groupApi.updateDebt(transaction.id, {
         title: title.trim(),
-        //description: description.trim(),
         amount: updatedAmount,
         currencyCode: currency,
         categoryId,
@@ -195,7 +213,7 @@ export function EditTransactionDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-currency">Valiuta</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} onValueChange={setCurrency} disabled={loadingCurrencies}>
                 <SelectTrigger id="edit-currency" className="w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
