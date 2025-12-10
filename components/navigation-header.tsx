@@ -117,32 +117,33 @@ export function NavigationHeader() {
     }
   }, [user])
 
-  // Pollinam ŽINUČIŲ burbuliuką (priklauso nuo nustatymų)
+  // Pollinam unread notif count (varpelis)
   useEffect(() => {
     if (!user) return
 
     let cancelled = false
     let intervalId: ReturnType<typeof setInterval> | null = null
 
-    const fetchMessagesBadge = async () => {
+    const fetchUnread = async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/api/notifications/messages-unread-count?userId=${user.id}`,
+          `${API_BASE}/api/notifications/unread-count?userId=${user.id}`,
         )
-        if (!res.ok) return
-
-        const { unreadCount } = await res.json()
-        if (cancelled) return
-
-        setHasNewMessages(unreadCount > 0)
+        if (!res.ok) {
+          console.error("Unread notif fetch not ok:", res.status)
+          return
+        }
+        const data = await res.json()
+        if (!cancelled) {
+          setUnreadNotifications(data.unreadCount ?? 0)
+        }
       } catch (err) {
-        if (!cancelled)
-          console.error("Messages badge fetch error:", err)
+        if (!cancelled) console.error("Unread notif fetch error:", err)
       }
     }
 
-    void fetchMessagesBadge()
-    intervalId = setInterval(fetchMessagesBadge, 5000)
+    void fetchUnread()
+    intervalId = setInterval(fetchUnread, 1000)
 
     return () => {
       cancelled = true
