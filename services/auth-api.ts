@@ -1,7 +1,7 @@
 // services/auth-api.ts
 import type { BackendUser } from "@/types/backend"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
 // --- LOGIN ---
 async function login(email: string, password: string): Promise<{ user: BackendUser }> {
@@ -98,6 +98,34 @@ async function changePassword(
   return res.json()
 }
 
+// --- REQUEST PASSWORD RESET ---
+async function requestPasswordReset(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/password/forgot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || "Nepavyko išsiųsti atkūrimo nuorodos")
+  }
+}
+
+// --- PASSWORD RESET ---
+async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/password/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, newPassword }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || "Nepavyko atkurti slaptažodžio")
+  }
+}
+
 async function uploadAvatar(
   file: File,
   userId: number | string,
@@ -129,4 +157,6 @@ export const authApi = {
   updateProfile,
   changePassword,
   uploadAvatar,
+  requestPasswordReset,
+  resetPassword,
 }

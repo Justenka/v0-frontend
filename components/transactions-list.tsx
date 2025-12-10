@@ -1,6 +1,7 @@
 "use client"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +15,7 @@ import { toast } from "sonner"
 import { EditTransactionDialog } from "./edit-transaction-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/types/user"
+import { groupApi } from "@/services/group-api"
 
 interface TransactionsListProps {
   transactions: Transaction[]
@@ -42,8 +44,75 @@ export default function TransactionsList({
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  
+  // Valiutų konvertavimas
+  const [userCurrency, setUserCurrency] = useState<{ id: number; name: string } | null>(null)
+  const [convertedAmounts, setConvertedAmounts] = useState<Record<number, number>>({})
+  const [isConverting, setIsConverting] = useState(false)
 
+  // Gauti vartotojo valiutą
+  useEffect(() => {
+    const fetchUserCurrency = async () => {
+      if (!user) return
+      
+      try {
 
+        const userData = await fetch(`${API_BASE}/api/vartotojai/${user.id}`).then(r => r.json())
+        const currencies = await groupApi.getAllCurrencies()
+        
+        const userCurr = currencies.find(c => c.id_valiuta === userData.valiutos_kodas)
+        if (userCurr) {
+          setUserCurrency({ id: userCurr.id_valiuta, name: userCurr.name })
+        }
+      } catch (error) {
+        console.error("Nepavyko gauti vartotojo valiutos:", error)
+      }
+    }
+
+    fetchUserCurrency()
+  }, [user])
+
+  // Konvertuoti transakcijas į vartotojo valiutą
+  useEffect(() => {
+    const convertTransactions = async () => {
+      if (!userCurrency || transactions.length === 0) return
+
+      setIsConverting(true)
+      const converted: Record<number, number> = {}
+
+      try {
+        for (const transaction of transactions) {
+          // Mapuojame valiutos kodą į id_valiuta
+          const transactionCurrencyId = 
+            transaction.currency === "EUR" ? 1 :
+            transaction.currency === "USD" ? 2 :
+            transaction.currency === "PLN" ? 3 : 1
+
+          if (transactionCurrencyId === userCurrency.id) {
+            // Ta pati valiuta, nereikia konvertuoti
+            converted[transaction.id] = transaction.amount
+          } else {
+            // Konvertuojame
+            const convertedAmount = await groupApi.convertCurrency(
+              transaction.amount,
+              transactionCurrencyId,
+              userCurrency.id
+            )
+            converted[transaction.id] = convertedAmount
+          }
+        }
+
+        setConvertedAmounts(converted)
+      } catch (error) {
+        console.error("Konvertavimo klaida:", error)
+        toast.error("Nepavyko konvertuoti valiutų")
+      } finally {
+        setIsConverting(false)
+      }
+    }
+
+    convertTransactions()
+  }, [transactions, userCurrency])
 
   // Get unique payers for filter
   const uniquePayers = Array.from(new Set(transactions.map((t) => t.paidBy)))
@@ -76,25 +145,16 @@ export default function TransactionsList({
     }
   })
   
-  // Patikrinti ar vartotojas gali redaguoti/ištrinti transakciją
   const canEditTransaction = (transaction: Transaction): boolean => {
     if (userRole === "guest") return false
-    
-    // Admin gali tik ištrinti (ne redaguoti)
-    // Tik mokėtojas gali redaguoti
-    // user.name jau yra "Vardas Pavardė" formato iš auth-context
     const isPayer = transaction.paidBy === user?.name
-    
     return isPayer
   }
 
   const canDeleteTransaction = (transaction: Transaction): boolean => {
     if (userRole === "guest") return false
-    
-    // Admin arba mokėtojas gali ištrinti
     const isAdmin = userRole === "admin"
     const isPayer = transaction.paidBy === user?.name
-    
     return isAdmin || isPayer
   }
 
@@ -134,6 +194,20 @@ export default function TransactionsList({
     }
   }
 
+  // Formatuojame sumą su vartotojo valiuta
+  const formatAmount = (transaction: Transaction): string => {
+    if (!userCurrency || isConverting) {
+      return formatCurrency(transaction.amount, transaction.currency)
+    }
+
+    const convertedAmount = convertedAmounts[transaction.id]
+    if (convertedAmount !== undefined) {
+      return formatCurrency(convertedAmount, userCurrency.name)
+    }
+
+    return formatCurrency(transaction.amount, transaction.currency)
+  }
+
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10">
@@ -157,7 +231,6 @@ export default function TransactionsList({
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {/* Filter by payer */}
             <Select value={filterBy} onValueChange={setFilterBy}>
               <SelectTrigger className="w-[140px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -173,7 +246,6 @@ export default function TransactionsList({
               </SelectContent>
             </Select>
 
-            {/* Filter by category */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Pagal kategoriją" />
@@ -188,7 +260,6 @@ export default function TransactionsList({
               </SelectContent>
             </Select>
 
-            {/* Sort by */}
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
@@ -202,6 +273,13 @@ export default function TransactionsList({
             </Select>
           </div>
         </div>
+
+        {/* Currency display notice */}
+        {userCurrency && (
+          <p className="text-xs text-muted-foreground">
+            Visos sumos rodomos: {userCurrency.name}
+          </p>
+        )}
 
         {/* Results count */}
         {searchQuery || filterBy !== "all" || categoryFilter !== "all" ? (
@@ -280,6 +358,15 @@ export default function TransactionsList({
                               </Badge>
                             </>
                           )}
+                          {/* Originalios valiutos indikatorius */}
+                          {transaction.currency !== userCurrency?.name && (
+                            <>
+                              <span className="text-gray-300">•</span>
+                              <Badge variant="outline" className="text-xs text-gray-500">
+                                Orig: {formatCurrency(transaction.amount, transaction.currency)}
+                              </Badge>
+                            </>
+                          )}
                         </div>
                         {transaction.lateFee && transaction.lateFeeDays && (
                           <Badge variant="outline" className="mt-2 text-yellow-700 border-yellow-300">
@@ -289,7 +376,7 @@ export default function TransactionsList({
                       </div>
                       <div className="text-right ml-4">
                         <p className="font-semibold text-lg">
-                          {formatCurrency(transaction.amount, transaction.currency)}
+                          {formatAmount(transaction)}
                         </p>
                       </div>
                     </div>
