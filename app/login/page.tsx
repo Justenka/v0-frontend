@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
-import { Chrome } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -35,19 +34,6 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 }
-
-  /*const handleGoogleLogin = async () => {
-    setIsLoading(true)
-    try {
-      await loginWithGoogle()
-      router.push("/")
-    } catch (err) {
-      setError("Failed to login with Google")
-    } finally {
-      setIsLoading(false)
-    }
-  }*/
-
   return (
         <>
       <Script
@@ -150,6 +136,11 @@ export default function LoginPage() {
               Registruotis
             </Link>
           </div>
+          <p className="text-sm text-right mt-2">
+            <Link href="/forgot-password" className="text-blue-600 hover:underline">
+              Pamiršote slaptažodį?
+            </Link>
+          </p>
           <Link href="/" className="text-sm text-blue-600 hover:underline">
             Tęsti kaip svečias
           </Link>

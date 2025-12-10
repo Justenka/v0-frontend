@@ -1,10 +1,10 @@
+// contexts/auth-context.tsx
 "use client"
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { AuthUser, User } from "@/types/user"
-import { mockUsers } from "@/lib/mock-data"
-import { authApi} from "@/services/auth-api"
+import { API_BASE, authApi} from "@/services/auth-api"
 import type { BackendUser } from "@/types/backend"
 
 interface AuthContextType {
@@ -14,6 +14,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   updateProfile: (updates: Partial<User>) => Promise<void>
+  uploadAvatar: (file: File) => Promise<void>
   isLoading: boolean
 }
 
@@ -44,14 +45,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Helper: map backend user -> AuthUser shape
   function mapBackendUserToAuthUser(backendUser: BackendUser): AuthUser {
+    const createdAt = backendUser.sukurimo_data
+      ? new Date(backendUser.sukurimo_data)
+      : new Date()
+
+    const lastLoginAt = backendUser.paskutinis_prisijungimas
+      ? new Date(backendUser.paskutinis_prisijungimas)
+      : createdAt
+
+    const avatar = backendUser.avatar_url
+      ? `${API_BASE}${backendUser.avatar_url}`
+      : undefined
+
     return {
       id: backendUser.id_vartotojas.toString(),
       name: `${backendUser.vardas} ${backendUser.pavarde}`,
       email: backendUser.el_pastas,
-      avatar: undefined, // kol kas neturim
-      createdAt: new Date(backendUser.sukurimo_data), // iš DATE/string → Date
-      lastLoginAt: new Date(backendUser.paskutinis_prisijungimas),
-      friends: [], // backend kol kas neteikia
+      avatar,
+      createdAt,
+      lastLoginAt,
+      friends: [],
       isAuthenticated: true,
     }
   }
@@ -90,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-
   const register = async (name: string, email: string, password: string) => {
     try {
       const { user: backendUser } = await authApi.register(name, email, password)
@@ -119,9 +131,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return
 
-    const updatedUser = { ...user, ...updates }
-    setUser(updatedUser)
-    localStorage.setItem("auth_user", JSON.stringify(updatedUser))
+    // ką siunčiam į backend – tik vardas + email
+    const payload = {
+      name: updates.name ?? user.name,
+      email: updates.email ?? user.email,
+    }
+
+    try {
+      const { user: backendUser } = await authApi.updateProfile(
+        payload,
+        Number(user.id), // mūsų authUser.id = id_vartotojas string formatu
+      )
+
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("updateProfile failed:", err)
+      throw err
+    }
+  }
+
+  const uploadAvatar = async (file: File) => {
+    if (!user) return
+
+    try {
+      const { user: backendUser } = await authApi.uploadAvatar(file, Number(user.id))
+      const authUser = mapBackendUserToAuthUser(backendUser)
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
+    } catch (err) {
+      console.error("uploadAvatar failed:", err)
+      throw err
+    }
   }
 
   return (
@@ -133,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         updateProfile,
+        uploadAvatar,
         isLoading,
       }}
     >
