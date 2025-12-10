@@ -94,17 +94,8 @@ export function EditTransactionDialog({
           percentage: s.percentage || 0,
         })))
 
-        // Determine split type
-        const hasPercentage = debtData.splits.some((s: any) => s.percentage > 0)
-        const hasCustomAmount = debtData.splits.some((s: any) => s.amount > 0 && s.role === 1)
+        setSplitType("percentage")
         
-        if (hasPercentage) {
-          setSplitType("percentage")
-        } else if (hasCustomAmount) {
-          setSplitType("custom")
-        } else {
-          setSplitType("equal")
-        }
       }
     } catch (error) {
       console.error("Failed to load transaction details:", error)
@@ -260,19 +251,6 @@ export function EditTransactionDialog({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Padalijimo būdas</Label>
-            <Select value={splitType} onValueChange={(v: any) => setSplitType(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="equal">Lygiai</SelectItem>
-                <SelectItem value="percentage">Procentais</SelectItem>
-                <SelectItem value="custom">Pagal sumas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         <DialogFooter>

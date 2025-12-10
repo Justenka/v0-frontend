@@ -25,6 +25,7 @@ interface TransactionsListProps {
   currentUserId?: number
   onEdit?: (transaction: Transaction) => void
   onDelete?: (transactionId: number) => Promise<void>
+  onSave?: () => void // Pridėkite šį tipą
 }
 
 export default function TransactionsList({
@@ -35,6 +36,7 @@ export default function TransactionsList({
   currentUserId,
   onEdit,
   onDelete,
+  onSave,
 }: TransactionsListProps) {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
@@ -86,7 +88,9 @@ export default function TransactionsList({
           const transactionCurrencyId = 
             transaction.currency === "EUR" ? 1 :
             transaction.currency === "USD" ? 2 :
-            transaction.currency === "PLN" ? 3 : 1
+            transaction.currency === "PLN" ? 3 :
+            transaction.currency === "GBP" ? 4 :
+            transaction.currency === "JPY" ? 5 : 1
 
           if (transactionCurrencyId === userCurrency.id) {
             // Ta pati valiuta, nereikia konvertuoti
@@ -147,8 +151,9 @@ export default function TransactionsList({
   
   const canEditTransaction = (transaction: Transaction): boolean => {
     if (userRole === "guest") return false
+    const isAdmin = userRole === "admin"
     const isPayer = transaction.paidBy === user?.name
-    return isPayer
+    return isPayer || isAdmin
   }
 
   const canDeleteTransaction = (transaction: Transaction): boolean => {
@@ -167,8 +172,9 @@ export default function TransactionsList({
     setIsEditDialogOpen(true)
   }
 
-  const handleSaveEdit = (updatedTransaction: Transaction) => {
-    onEdit?.(updatedTransaction)
+const handleSaveEdit = () => {
+    onSave?.(); // Kviečiame tėvinio komponento duomenų atnaujinimą
+    setIsEditDialogOpen(false);
   }
 
   const handleDelete = async (transaction: Transaction) => {
