@@ -418,7 +418,7 @@ export default function GroupPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Transakcijos</CardTitle>
+              <CardTitle>Išlaidos</CardTitle>
             </CardHeader>
             <CardContent>
               <TransactionsList
