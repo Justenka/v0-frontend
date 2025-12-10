@@ -6,17 +6,13 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { lt } from "date-fns/locale"
 
 import type { GroupMessage } from "@/types/message"
 import { useAuth } from "@/contexts/auth-context"
-import {
-  getGroupMessages,
-  sendGroupMessage,
-} from "@/services/groupMessages-api"
+import { getGroupMessages, sendGroupMessage } from "@/services/groupMessages-api"
 
 interface GroupChatProps {
   groupId: string
@@ -30,9 +26,34 @@ export function GroupChat({ groupId }: GroupChatProps) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
-  // 🔁 Periodiškai traukiam naujas žinutes
+  // ar automatiškai scrollinti į apačią atėjus naujoms žinutėms
+  const [autoScroll, setAutoScroll] = useState(true)
+
+  const scrollToBottom = () => {
+    const el = messagesRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }
+
+  const focusInput = () => {
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 0)
+  }
+
+  const handleScroll = () => {
+    const el = messagesRef.current
+    if (!el) return
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    // jei esam arti apačios (< 80px), laikom, kad "on bottom" ir autoScroll = true
+    setAutoScroll(distanceFromBottom < 80)
+  }
+
+  // 🔁 Periodiškai traukiam žinutes
   useEffect(() => {
     if (!groupId) return
 
@@ -46,17 +67,9 @@ export function GroupChat({ groupId }: GroupChatProps) {
 
         const data = await getGroupMessages(groupId)
 
-        setMessages(prev => {
-          if (prev.length === 0 || initial) {
-            return data
-          }
-
-          const maxId = prev[prev.length - 1]?.id ?? 0
-          const newOnes = data.filter(m => m.id > maxId)
-
-          if (newOnes.length === 0) return prev
-          return [...prev, ...newOnes]
-        })
+        if (!cancelled) {
+          setMessages(data)
+        }
       } catch (err: any) {
         console.error(err)
         if (!cancelled) {
@@ -67,12 +80,10 @@ export function GroupChat({ groupId }: GroupChatProps) {
       }
     }
 
-    // Pirmas užkrovimas
-    loadMessages(true)
+    void loadMessages(true)
 
-    // Kas 1 sekundes tikrinam naujas
     intervalId = setInterval(() => {
-      loadMessages(false)
+      void loadMessages(false)
     }, 1000)
 
     return () => {
@@ -81,39 +92,50 @@ export function GroupChat({ groupId }: GroupChatProps) {
     }
   }, [groupId])
 
-  // Scroll į apačią kai keičiasi žinutės
+  // kai keičiasi žinutės -> scrollinam tik jei autoScroll = true
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (autoScroll) {
+      scrollToBottom()
     }
-  }, [messages])
+  }, [messages, autoScroll])
+
+  // kai atidarom chatą -> fokusas ant inputo
+  useEffect(() => {
+    if (user && groupId) {
+      focusInput()
+    }
+  }, [user, groupId])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !newMessage.trim()) return
+    if (!user) return
+
+    const content = newMessage.trim()
+    if (!content) return
 
     const userIdNum = Number(user.id)
-    if (Number.isNaN(userIdNum)) {
-      console.error("user.id ne skaičius", user.id)
-      return
-    }
+    if (Number.isNaN(userIdNum)) return
+
+    // išvalom tekstą ir paliekam fokusą
+    setNewMessage("")
+    focusInput()
+    // kai mes patys siunčiam – norim visada būti apačioj
+    setAutoScroll(true)
 
     try {
       setSending(true)
       setError(null)
+      const saved = await sendGroupMessage(groupId, userIdNum, content)
 
-      const saved = await sendGroupMessage(
-        groupId,
-        userIdNum,
-        newMessage.trim(),
-      )
-
-      // Optimistinis append'as – iškart matysi savo žinutę
-      setMessages(prev => [...prev, saved])
-      setNewMessage("")
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === saved.id)
+        return exists ? prev : [...prev, saved]
+      })
+      scrollToBottom()
     } catch (err: any) {
       console.error(err)
       setError(err.message || "Nepavyko išsiųsti žinutės")
+      focusInput()
     } finally {
       setSending(false)
     }
@@ -129,7 +151,12 @@ export function GroupChat({ groupId }: GroupChatProps) {
 
   return (
     <div className="flex flex-col h-[600px] border rounded-lg">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      {/* scrollinamas chat'as */}
+      <div
+        ref={messagesRef}
+        className="flex-1 p-4 overflow-y-auto"
+        onScroll={handleScroll}
+      >
         <div className="space-y-4">
           {loading && messages.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
@@ -204,17 +231,19 @@ export function GroupChat({ groupId }: GroupChatProps) {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
+      {/* įvedimo zona */}
       <form onSubmit={handleSendMessage} className="border-t p-4">
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             placeholder={
               user ? "Rašykite žinutę..." : "Prisijunkite, kad galėtumėte rašyti"
             }
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            disabled={!user || sending}
+            disabled={!user}
             className="flex-1"
           />
           <Button
