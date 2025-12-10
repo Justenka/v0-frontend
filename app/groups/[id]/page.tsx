@@ -46,6 +46,7 @@ export default function GroupPage() {
   const [userRole, setUserRole] = useState<UserRole>("guest") // Pridėkite naują state
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview")
 
   const [editDialog, setEditDialog] = useState<{
     open: boolean
@@ -69,7 +70,42 @@ export default function GroupPage() {
   }))
 
   useEffect(() => {
-    const fetchData = async () => {
+    if (!groupId || Number.isNaN(groupId)) return
+    if (typeof window === "undefined") return
+
+    const key = `group-${groupId}-tab`
+    const saved = window.localStorage.getItem(key)
+    if (saved === "chat" || saved === "overview") {
+      setActiveTab(saved)
+    }
+  }, [groupId])
+
+  const handleTabChange = (value: string) => {
+    const val = value === "chat" ? "chat" : "overview"
+    setActiveTab(val)
+
+    if (typeof window !== "undefined" && groupId && !Number.isNaN(groupId)) {
+      const key = `group-${groupId}-tab`
+      window.localStorage.setItem(key, val)
+    }
+  }
+
+  useEffect(() => {
+  const fetchData = async () => {
+    // jei groupId neteisingas – išeinam
+    if (!groupId || Number.isNaN(groupId)) {
+      console.error("Group id is invalid")
+      setLoading(false)
+      return
+    }
+
+    // kol auth dar kraunasi – nieko nedarom
+    if (isLoading) return
+
+    // jei user nėra – nieko nefetchinam, auth guard viršuje pats nuves į /login
+    if (!user) return
+
+    try {
       // Fetch globalios kategorijos
       try {
         const allCategories = await groupApi.getCategories()
@@ -78,94 +114,82 @@ export default function GroupPage() {
         console.error("Nepavyko įkelti kategorijų:", error)
       }
 
+      const userId = Number(user.id)
+      console.log("User role:", user.id)
+
       try {
-        if (!groupId || Number.isNaN(groupId)) {
-          console.error("Group id is invalid")
-          setLoading(false)
-          return
-        }
-
-        if (!user) {
-          // jei vartotojas neprisijungęs – metam į login
-          router.push("/login")
-          setLoading(false)
-          return
-        }
-
-        const userId = Number(user.id)
-        console.log("User role:", user.id)
-        try {
-          const role = await groupApi.getUserRoleInGroup(groupId, userId)
-          setUserRole(role)
-          console.log("User role in group:", role)
-        } catch (error) {
-          console.error("Nepavyko gauti vartotojo rolės:", error)
-          setUserRole("guest") // Default į guest jei klaida
-        }
-
-
-        const backendGroups: BackendGroupForUser[] = await groupApi.getUserGroupsBackend(userId)
-
-        const backendGroup = backendGroups.find((g) => g.id_grupe === groupId)
-        if (!backendGroup) {
-          console.error("Group not found in backend")
-          setGroup(null)
-          setLoading(false)
-          return
-        }
-
-        const debts = await groupApi.getDebtsByGroup(groupId)
-
-        const mappedTransactions = debts.map((d: any) => ({
-          id: d.id_skola,
-          title: d.pavadinimas,
-          description: d.aprasymas || "",
-          amount: Number(d.suma),
-          currency:
-            d.valiutos_kodas === 1 ? "EUR" :
-              d.valiutos_kodas === 2 ? "USD" : "PLN",
-          date: d.sukurimo_data,
-          paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
-          categoryId: d.kategorija ? String(d.kategorija) : null,
-          splitType: "Lygiai" // kol kas
-        }))
-
-        // Mapinam į Group tipą
-        const groupData: Group = {
-          id: backendGroup.id_grupe,
-          title: backendGroup.pavadinimas,
-          description: backendGroup.aprasas ?? null,
-          createdAt: backendGroup.sukurimo_data,
-
-          ownerId: undefined,
-          ownerFirstName: backendGroup.owner_vardas,
-          ownerLastName: backendGroup.owner_pavarde,
-
-          role: backendGroup.role,
-          memberStatus: backendGroup.nario_busena,
-
-          members: [],
-          transactions: [],
-          balance: 0,
-        }
-
-        // Gauname pilnus grupės duomenis
-        const fullGroupData = await groupApi.getGroup(groupId)
-        setGroup(fullGroupData)
-        setMembers(fullGroupData.members || [])
-        setTransactions(mappedTransactions)
+        const role = await groupApi.getUserRoleInGroup(groupId, userId)
+        setUserRole(role)
+        console.log("User role in group:", role)
       } catch (error) {
-        console.error("Failed to load data:", error)
-        setGroup(null)
-      } finally {
-        setLoading(false)
+        console.error("Nepavyko gauti vartotojo rolės:", error)
+        setUserRole("guest")
       }
-    }
 
-    if (groupId) {
-      fetchData()
+      const backendGroups: BackendGroupForUser[] =
+        await groupApi.getUserGroupsBackend(userId)
+
+      const backendGroup = backendGroups.find((g) => g.id_grupe === groupId)
+      if (!backendGroup) {
+        console.error("Group not found in backend")
+        setGroup(null)
+        setLoading(false)
+        return
+      }
+
+      const debts = await groupApi.getDebtsByGroup(groupId)
+
+      const mappedTransactions = debts.map((d: any) => ({
+        id: d.id_skola,
+        title: d.pavadinimas,
+        description: d.aprasymas || "",
+        amount: Number(d.suma),
+        currency:
+          d.valiutos_kodas === 1
+            ? "EUR"
+            : d.valiutos_kodas === 2
+            ? "USD"
+            : "PLN",
+        date: d.sukurimo_data,
+        paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+        categoryId: d.kategorija ? String(d.kategorija) : null,
+        splitType: "Lygiai",
+      }))
+
+      const groupData: Group = {
+        id: backendGroup.id_grupe,
+        title: backendGroup.pavadinimas,
+        description: backendGroup.aprasas ?? null,
+        createdAt: backendGroup.sukurimo_data,
+
+        ownerId: undefined,
+        ownerFirstName: backendGroup.owner_vardas,
+        ownerLastName: backendGroup.owner_pavarde,
+
+        role: backendGroup.role,
+        memberStatus: backendGroup.nario_busena,
+
+        members: [],
+        transactions: [],
+        balance: 0,
+      }
+
+      const fullGroupData = await groupApi.getGroup(groupId)
+      setGroup(fullGroupData)
+      setMembers(fullGroupData.members || [])
+      setTransactions(mappedTransactions)
+    } catch (error) {
+      console.error("Failed to load data:", error)
+      setGroup(null)
+    } finally {
+      setLoading(false)
     }
-  }, [groupId, router, user])
+  }
+
+  if (groupId) {
+    void fetchData()
+  }
+}, [groupId, router, user, isLoading])
 
   const handleAddMember = async (name: string): Promise<boolean> => {
     if (userRole === "guest") {
@@ -387,7 +411,7 @@ export default function GroupPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Apžvalga</TabsTrigger>
           <TabsTrigger value="chat">
@@ -410,7 +434,13 @@ export default function GroupPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <MembersList members={members} onSettleUp={handleSettleUp} onRemoveMember={handleRemoveMember} />
+              <MembersList 
+              members={members} 
+              onSettleUp={handleSettleUp} 
+              onRemoveMember={handleRemoveMember} 
+              groupId={groupId}
+              onBalanceUpdate={refreshGroupData}
+              />
             </CardContent>
           </Card>
 

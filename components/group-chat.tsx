@@ -53,7 +53,7 @@ export function GroupChat({ groupId }: GroupChatProps) {
     setAutoScroll(distanceFromBottom < 80)
   }
 
-  // 🔁 Periodiškai traukiam žinutes
+  // Periodiškai traukiam žinutes
   useEffect(() => {
     if (!groupId) return
 
@@ -184,8 +184,11 @@ export function GroupChat({ groupId }: GroupChatProps) {
                 >
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarImage
-                      src={user?.avatar || "/placeholder.svg"}
+                      src={message.senderAvatar || "/placeholder.svg"}
                       alt={message.senderName}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = "/placeholder.svg"
+                      }}
                     />
                     <AvatarFallback className="text-xs">
                       {getInitials(message.senderName)}
