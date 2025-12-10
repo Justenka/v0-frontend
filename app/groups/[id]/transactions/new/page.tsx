@@ -19,7 +19,6 @@ import type { Category } from "@/types/category"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import { Stepper, StepContent } from "@/components/ui/stepper"
-import { CurrencyConverterDialog } from "@/components/currency-converter-dialog"
 import { supportedCurrencies } from "@/lib/currency-api"
 
 export default function NaujaIslaidaPuslapis() {
@@ -38,7 +37,7 @@ export default function NaujaIslaidaPuslapis() {
   const [enableLateFee, setEnableLateFee] = useState(false)
   const [lateFeeAmount, setLateFeeAmount] = useState("")
   const [lateFeeDays, setLateFeeDays] = useState("7")
-  const [isCurrencyConverterOpen, setIsCurrencyConverterOpen] = useState(false)
+
   const [categoryId, setCategoryId] = useState<string>("")
   const [categories, setCategories] = useState<Category[]>([])
 
@@ -294,16 +293,7 @@ const isDynamicValid = () => {
                   </div>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsCurrencyConverterOpen(true)}
-                  className="w-full"
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Valiutos konverteris
-                </Button>
+
 
                 <div className="border-t pt-4 space-y-4">
                   <div className="flex items-center space-x-2">
@@ -582,7 +572,7 @@ const isDynamicValid = () => {
         </form>
       </Card>
 
-      <CurrencyConverterDialog open={isCurrencyConverterOpen} onOpenChange={setIsCurrencyConverterOpen} />
+
     </div>
   )
 }
