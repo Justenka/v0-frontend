@@ -1,15 +1,14 @@
-// src/services/groupMessagesApi.ts
 import type { GroupMessage } from "@/types/message"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
-// Kaip žinutė grįžta iš backend'o
 interface ApiGroupMessage {
   id: number
   groupId: number
   groupMemberId: number
   senderId: number
   senderName: string
+  senderAvatar: string | null
   content: string
   sentAt: string
   edited: number
@@ -17,52 +16,56 @@ interface ApiGroupMessage {
   deleted: number
 }
 
-function mapApiToGroupMessage(m: ApiGroupMessage): GroupMessage {
-  return {
+export async function getGroupMessages(groupId: string): Promise<GroupMessage[]> {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/messages`, {
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || "Nepavyko gauti žinučių")
+  }
+
+  const data = await res.json()
+  const arr: ApiGroupMessage[] = Array.isArray(data) ? data : (data.messages ?? [])
+
+  return arr.map((m) => ({
     id: m.id,
     groupId: m.groupId,
     senderId: m.senderId,
     senderName: m.senderName,
+    senderAvatar: m.senderAvatar ? `${API_BASE}${m.senderAvatar}` : null,
     content: m.content,
     timestamp: new Date(m.sentAt),
     read: 0,
-  }
-}
-
-export async function getGroupMessages(
-  groupId: string | number,
-): Promise<GroupMessage[]> {
-  const res = await fetch(`${API_BASE}/api/groups/${groupId}/messages`, {
-    credentials: "include",
-  })
-
-  if (!res.ok) {
-    throw new Error("Nepavyko užkrauti grupės žinučių")
-  }
-
-  const data = (await res.json()) as ApiGroupMessage[]
-  return data.map(mapApiToGroupMessage)
+  }))
 }
 
 export async function sendGroupMessage(
-  groupId: string | number,
+  groupId: string,
   senderId: number,
   content: string,
 ): Promise<GroupMessage> {
   const res = await fetch(`${API_BASE}/api/groups/${groupId}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ senderId, content }),
   })
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(text || "Nepavyko išsiųsti žinutės")
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || "Nepavyko išsiųsti žinutės")
   }
 
-  const data = (await res.json()) as ApiGroupMessage
-  return mapApiToGroupMessage(data)
+  const m: ApiGroupMessage = await res.json()
+
+  return {
+    id: m.id,
+    groupId: m.groupId,
+    senderId: m.senderId,
+    senderName: m.senderName,
+    senderAvatar: m.senderAvatar ? `${API_BASE}${m.senderAvatar}` : null,
+    content: m.content,
+    timestamp: new Date(m.sentAt),
+    read: 0,
+  }
 }

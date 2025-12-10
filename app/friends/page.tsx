@@ -110,7 +110,6 @@ export default function FriendsPage() {
       const requests = await friendsApi.getFriendRequests(Number(user.id))
       setOutgoingRequests(requests.outgoing)
     } catch (err: any) {
-      console.error("Failed to send invite:", err)
       toast.error(err.message || "Nepavyko išsiųsti kvietimo")
     }
   }
