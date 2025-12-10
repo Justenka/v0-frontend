@@ -11,3 +11,15 @@ export interface Transaction {
   categoryId?: string // Added category support
   categoryName?: string;
 }
+
+export interface TransactionWithSplits extends Transaction {
+  splits: {
+    id: number
+    userId: number
+    userName: string
+    amount: number
+    percentage: number
+    role: number
+    paid: boolean
+  }[]
+}

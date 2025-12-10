@@ -2,6 +2,8 @@
 import type { BackendGroupForUser } from "@/types/backend"
 import type { Group } from "@/types/group"
 import type { Category } from "@/types/category";
+import type { Transaction, TransactionWithSplits } from "@/types/transaction";
+import type { Payment } from "@/types/payment";
 import {
   getGroupById,
   addMemberToGroup,
@@ -11,6 +13,7 @@ import {
   deleteMockGroup,
 } from "@/lib/mock-data"
 import { UserRole } from "@/types/user";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
@@ -62,41 +65,41 @@ export const groupApi = {
 
     // Create a new group
     createGroupBackend: async (
-    title: string,
-    ownerId: number,
-    description?: string,
+        title: string,
+        ownerId: number,
+        description?: string,
     ): Promise<BackendGroupForUser> => {
         const res = await fetch(`${API_BASE}/api/groups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-        title,
-        description,
-        ownerId,
-        }),
-    })
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                title,
+                description,
+                ownerId,
+            }),
+        })
 
-     const data = await res.json().catch(() => null)
+        const data = await res.json().catch(() => null)
 
-    if (!res.ok) {
-        const message = data?.message || "Nepavyko sukurti grupės"
-        throw new Error(message)
-    }
+        if (!res.ok) {
+            const message = data?.message || "Nepavyko sukurti grupės"
+            throw new Error(message)
+        }
 
-    return data as BackendGroupForUser
+        return data as BackendGroupForUser
     },
 
     // grupės, kuriose prisijungęs useris yra narys (iš DB)
     getUserGroupsBackend: async (
-    userId: number,
+        userId: number,
     ): Promise<BackendGroupForUser[]> => {
         const res = await fetch(`${API_BASE}/api/groups-by-user/${userId}`)
 
         const data = await res.json().catch(() => null)
 
         if (!res.ok) {
-        const message = data?.message || "Nepavyko gauti grupių sąrašo"
-        throw new Error(message)
+            const message = data?.message || "Nepavyko gauti grupių sąrašo"
+            throw new Error(message)
         }
 
         return data as BackendGroupForUser[]
@@ -146,23 +149,23 @@ export const groupApi = {
 
     // Gauti kategorijas (globalias, nes nėra per grupę)
     async getCategories(): Promise<Category[]> {
-    const response = await fetch(`${API_BASE}/api/categories`);
-    if (!response.ok) {
-      throw new Error('Nepavyko gauti kategorijų');
-    }
-    const data = await response.json();
+        const response = await fetch(`${API_BASE}/api/categories`);
+        if (!response.ok) {
+            throw new Error('Nepavyko gauti kategorijų');
+        }
+        const data = await response.json();
 
-    // Normalizuojame – visada grąžiname { id: string, name: string }
-    return data.map((cat: any) => ({
-      id: String(cat.id_kategorija ?? cat.id ?? ""), // saugumas
-      name: cat.name ?? cat.pavadinimas ?? "Be pavadinimo",
-    }));
-  },
+        // Normalizuojame – visada grąžiname { id: string, name: string }
+        return data.map((cat: any) => ({
+            id: String(cat.id_kategorija ?? cat.id ?? ""), // saugumas
+            name: cat.name ?? cat.pavadinimas ?? "Be pavadinimo",
+        }));
+    },
 
-  // Jei dar naudojate getCategoriesByGroup – nukreipkite į tą patį
-  async getCategoriesByGroup(_groupId: number): Promise<Category[]> {
-    return this.getCategories(); // globalios kategorijos
-  },
+    // Jei dar naudojate getCategoriesByGroup – nukreipkite į tą patį
+    async getCategoriesByGroup(_groupId: number): Promise<Category[]> {
+        return this.getCategories(); // globalios kategorijos
+    },
 
     //Create a new debt
     async createDebt(data: {
@@ -179,19 +182,19 @@ export const groupApi = {
         lateFeeAfterDays?: number;
     }) {
         const response = await fetch(`${API_BASE}/api/debts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-        const err = await response.json().catch(() => ({ message: 'Serverio klaida' }));
-        throw new Error(err.message || 'Nepavyko sukurti skolos');
+            const err = await response.json().catch(() => ({ message: 'Serverio klaida' }));
+            throw new Error(err.message || 'Nepavyko sukurti skolos');
         }
 
         return response.json();
     },
-    
+
     // Gauti visas grupės skolas
     async getDebtsByGroup(groupId: number) {
         const res = await fetch(`${API_BASE}/api/debts-by-group/${groupId}`)
@@ -206,9 +209,9 @@ export const groupApi = {
     async deleteDebt(debtId: number, userId: number): Promise<void> {
         const res = await fetch(`${API_BASE}/api/debts/${debtId}?userId=${userId}`, {
             method: 'DELETE',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': String(userId) 
+                'x-user-id': String(userId)
             },
         })
 
@@ -221,20 +224,112 @@ export const groupApi = {
     },
 
     async getUserRoleInGroup(groupId: number, userId: number): Promise<UserRole> {
-    const res = await fetch(`${API_BASE}/api/grupes/${groupId}/nariai/${userId}/role`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    })
-   
-    if (!res.ok) {
-      throw new Error("Nepavyko gauti vartotojo rolės")
-    }
-     
-    const data = await res.json()
-    console.log(data.roleText);
-    return data.roleText as UserRole
-  },
+        const res = await fetch(`${API_BASE}/api/grupes/${groupId}/nariai/${userId}/role`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+        })
 
+        if (!res.ok) {
+            throw new Error("Nepavyko gauti vartotojo rolės")
+        }
 
+        const data = await res.json()
+        console.log(data.roleText);
+        return data.roleText as UserRole
+    },
+
+    //------------------------------------------------------------------------------------------------------------------------
+
+    // Get specific debt with splits
+    async getDebt(debtId: number): Promise<TransactionWithSplits> {
+        const res = await fetch(`${API_BASE}/api/debts/${debtId}`)
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko gauti skolos")
+        }
+        
+        return res.json()
+    },
+
+    // Update debt (edit transaction)
+    async updateDebt(
+        debtId: number,
+        data: {
+            title: string;
+            description?: string;
+            amount: number;
+            currencyCode: string;
+            categoryId?: string;
+            splits?: { userId: number; amount?: number; percentage?: number }[];
+            userId: number;
+        }
+    ) {
+        const res = await fetch(`${API_BASE}/api/debts/${debtId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        })
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko atnaujinti skolos")
+        }
+
+        return res.json()
+    },
+
+    // Get balances for a user in a group
+    async getUserBalances(groupId: number, userId: number): Promise<{
+        userId: number;
+        userName: string;
+        amount: number;
+        currency: string;
+        type: 'owes_me' | 'i_owe';
+    }[]> {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/balances/${userId}`)
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko gauti balansų")
+        }
+        
+        return res.json()
+    },
+
+    // Make a partial payment
+    async makePayment(data: {
+        groupId: number;
+        fromUserId: number;
+        toUserId: number;
+        amount: number;
+        currencyCode?: string;
+        note?: string;
+    }): Promise<{ message: string; paymentId: number }> {
+        const res = await fetch(`${API_BASE}/api/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        })
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko įrašyti mokėjimo")
+        }
+
+        return res.json()
+    },
+
+    // Get payment history
+    async getPaymentHistory(groupId: number): Promise<Payment[]> {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/payments`)
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || "Nepavyko gauti mokėjimų istorijos")
+        }
+        
+        return res.json()
+    },
 
 }

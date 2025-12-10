@@ -23,6 +23,7 @@ import TransactionsList from "@/components/transactions-list"
 import AddMemberDialog from "@/components/add-member-dialog"
 import { GroupSettingsDialog } from "@/components/group-settings-dialog"
 import { GroupChat } from "@/components/group-chat"
+import { EditTransactionDialog } from "@/components/edit-transaction-dialog"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/types/user"
@@ -45,6 +46,11 @@ export default function GroupPage() {
   const [userRole, setUserRole] = useState<UserRole>("guest") // Pridėkite naują state
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean
+    transaction: Transaction | null
+  }>({ open: false, transaction: null })
 
   // Auth guard
   useEffect(() => {
@@ -96,7 +102,7 @@ export default function GroupPage() {
           console.error("Nepavyko gauti vartotojo rolės:", error)
           setUserRole("guest") // Default į guest jei klaida
         }
-         
+
 
         const backendGroups: BackendGroupForUser[] = await groupApi.getUserGroupsBackend(userId)
 
@@ -213,8 +219,35 @@ export default function GroupPage() {
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
-    console.log("Edit transaction:", transaction)
-    toast.info("Redagavimo funkcionalumas dar neimplementuotas")
+    setEditDialog({ open: true, transaction })
+  }
+
+  const handleSaveEdit = async () => {
+    try {
+      const groupData = await groupApi.getGroup(groupId)
+      if (groupData) {
+        setGroup(groupData)
+        setMembers(groupData.members || [])
+      }
+
+      const debts = await groupApi.getDebtsByGroup(groupId)
+      const mappedTransactions = debts.map((d: any) => ({
+        id: d.id_skola,
+        title: d.pavadinimas,
+        description: d.aprasymas || "",
+        amount: Number(d.suma),
+        currency:
+          d.valiutos_kodas === 1 ? "EUR" :
+            d.valiutos_kodas === 2 ? "USD" : "PLN",
+        date: d.sukurimo_data,
+        paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+        categoryId: d.kategorija ? String(d.kategorija) : null,
+        splitType: "Lygiai"
+      }))
+      setTransactions(mappedTransactions)
+    } catch (error) {
+      console.error("Failed to refresh after edit:", error)
+    }
   }
 
   const handleDeleteTransaction = async (transactionId: number) => {
@@ -225,10 +258,10 @@ export default function GroupPage() {
 
     try {
       await groupApi.deleteDebt(transactionId, Number(user.id))
-      
+
       // Pašaliname iš local state
       setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
-      
+
       // Refresh grupės duomenis
       const groupData = await groupApi.getGroup(groupId)
       if (groupData) {
@@ -240,6 +273,38 @@ export default function GroupPage() {
       throw error // Throw error kad TransactionsList gautų ir parodytų toast
     }
   }
+
+  const refreshGroupData = async () => {
+  try {
+    if (!groupId || Number.isNaN(groupId)) return
+
+    // Refresh group and members
+    const groupData = await groupApi.getGroup(groupId)
+    if (groupData) {
+      setGroup(groupData)
+      setMembers(groupData.members || [])
+    }
+
+    // Refresh transactions
+    const debts = await groupApi.getDebtsByGroup(groupId)
+    const mappedTransactions = debts.map((d: any) => ({
+      id: d.id_skola,
+      title: d.pavadinimas,
+      description: d.aprasymas || "",
+      amount: Number(d.suma),
+      currency:
+        d.valiutos_kodas === 1 ? "EUR" :
+          d.valiutos_kodas === 2 ? "USD" : "PLN",
+      date: d.sukurimo_data,
+      paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+      categoryId: d.kategorija ? String(d.kategorija) : null,
+      splitType: "Lygiai"
+    }))
+    setTransactions(mappedTransactions)
+  } catch (error) {
+    console.error("Failed to refresh group data:", error)
+  }
+}
 
   if (loading) {
     return (
@@ -266,7 +331,7 @@ export default function GroupPage() {
       </div>
     )
   }
-  
+
   const canAddExpense = userRole !== "guest" && members.length > 0
 
   return (
@@ -392,6 +457,16 @@ export default function GroupPage() {
         members={groupMembers}
         currentUserRole={userRole}
       />
+
+      <EditTransactionDialog
+        open={editDialog.open}
+        onOpenChange={(open) => setEditDialog({ open, transaction: null })}
+        transaction={editDialog.transaction}
+        members={members}
+        categories={categories}
+        onSave={handleSaveEdit}
+      />
+
     </div>
   )
 }

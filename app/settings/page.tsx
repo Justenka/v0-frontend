@@ -1,113 +1,155 @@
-"use client"
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
+"use client";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
+} from "@/components/ui/select";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
 
-// Tipai pagal tavo DB
 type Valiuta = {
-  id_valiuta: number
-  name: string
-}
+  id_valiuta: number;
+  name: string;
+};
+
+type NotificationSettings = {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  friendRequests: boolean;
+};
 
 export default function SettingsPage() {
-  const router = useRouter()
-  const { user, isLoading } = useAuth()
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
 
-  // Notification settings
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [pushNotifications, setPushNotifications] = useState(true)
-  const [groupInvites, setGroupInvites] = useState(true)
-  const [newExpenses, setNewExpenses] = useState(true)
-  const [paymentReminders, setPaymentReminders] = useState(true)
-  const [messages, setMessages] = useState(true)
+  // Pranešimai
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [friendRequests, setFriendRequests] = useState(true);
 
-// Valiutų būsena
-  const [valiutos, setValiutos] = useState<Valiuta[]>([])
-  const [selectedValiuta, setSelectedValiuta] = useState<string>("")
-  const [isSaving, setIsSaving] = useState(false)
+  // UI „tipai“ (kol kas tik front-end dekoracija, jei nori – vėliau irgi išsaugosim)
+  const [groupInvites, setGroupInvites] = useState(true);
+  const [newExpenses, setNewExpenses] = useState(true);
+  const [paymentReminders, setPaymentReminders] = useState(true);
+  const [messages, setMessages] = useState(true);
+
+  // Valiutų būsena
+  const [valiutos, setValiutos] = useState<Valiuta[]>([]);
+  const [selectedValiuta, setSelectedValiuta] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login")
+      router.push("/login");
     }
-  }, [isLoading, user, router])
+  }, [isLoading, user, router]);
 
-// Užkrauname valiutas ir vartotojo pasirinkimą
+  // Užkrauname valiutas + pranešimų nustatymus
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return
+      if (!user) return;
 
       try {
-        // 1. Užkrauname visas valiutas
-        const valResp = await fetch(`${API_BASE}/api/valiutos`)
-        const valData = await valResp.json()
-        setValiutos(valData)
+        // 1. Valiutos
+        const valResp = await fetch(`${API_BASE}/api/valiutos`);
+        const valData = await valResp.json();
+        setValiutos(valData);
 
-        // 2. Užkrauname vartotojo dabartinę valiutą
-        const userResp = await fetch(`${API_BASE}/api/vartotojai/${user.id}`)
-        const userData = await userResp.json()
+        const userResp = await fetch(`${API_BASE}/api/vartotojai/${user.id}`);
+        const userData = await userResp.json();
+        setSelectedValiuta(String(userData.valiutos_kodas));
 
-        // userData.valiutos_kodas yra id_valiuta (pvz. 1, 2, 3)
-        setSelectedValiuta(String(userData.valiutos_kodas))
-      } catch (err) {
-        console.error(err)
-        toast.error("Nepavyko užkrauti nustatymų")
+        // 2. Pranešimų nustatymai
+      const notifResp = await fetch(
+        `${API_BASE}/api/pranesimu-nustatymai/${user.id}`
+      )
+      if (notifResp.ok) {
+        const notifData = await notifResp.json()
+        setEmailNotifications(!!notifData.el_pastas_aktyvus)
+        setPushNotifications(!!notifData.push_pranesimai)
+        setFriendRequests(!!notifData.draugu_kvietimai)
+        setGroupInvites(!!notifData.grupes_kvietimai)
+        setNewExpenses(!!notifData.naujos_islaidos)
+        setPaymentReminders(!!notifData.mokejimo_priminimai)
+        setMessages(!!notifData.zinutes)
+      } else {
+        console.warn("Nepavyko gauti pranešimų nustatymų")
       }
-    }
+      } catch (err) {
+        console.error(err);
+        toast.error("Nepavyko užkrauti nustatymų");
+      }
+    };
 
     if (!isLoading && user) {
-      void fetchData()
+      void fetchData();
     }
-  }, [isLoading, user])
+  }, [isLoading, user]);
 
-  // Išsaugojimo funkcija – tik valiutai (kol kas)
   const handleSave = async () => {
     if (!user) return
-
     setIsSaving(true)
+
     try {
-      const res = await fetch(`${API_BASE}/api/vartotojai/${user.id}`, {
+      // 1) valiuta
+      const currencyRes = await fetch(`${API_BASE}/api/vartotojai/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          valiutos_kodas: Number(selectedValiuta),
-        }),
+        body: JSON.stringify({ valiutos_kodas: Number(selectedValiuta) }),
       })
+      if (!currencyRes.ok) throw new Error("Nepavyko išsaugoti valiutos")
 
-      if (!res.ok) throw new Error("Nepavyko išsaugoti")
+      // 2) pranešimų nustatymai
+      const notifRes = await fetch(
+        `${API_BASE}/api/pranesimu-nustatymai/${user.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            el_pastas_aktyvus: emailNotifications,
+            push_pranesimai: pushNotifications,
+            draugu_kvietimai: friendRequests,
+            grupes_kvietimai: groupInvites,
+            naujos_islaidos: newExpenses,
+            mokejimo_priminimai: paymentReminders,
+            zinutes: messages,
+          }),
+        },
+      )
+
+      if (!notifRes.ok) {
+        const body = await notifRes.json().catch(() => ({}))
+        throw new Error(body.message || "Nepavyko išsaugoti pranešimų nustatymų")
+      }
 
       toast.success("Nustatymai išsaugoti")
-    } catch (err) {
-      toast.error("Klaida saugant valiutą")
+    } catch (err: any) {
       console.error(err)
+      toast.error(err.message || "Klaida saugant nustatymus")
     } finally {
       setIsSaving(false)
     }
   }
 
-  // Loading būsena – rodomas centruotas tekstas, kaip ir kitur
   if (isLoading) {
-    return <div className="text-center py-20 text-gray-500">Kraunama...</div>
+    return <div className="text-center py-20 text-gray-500">Kraunama...</div>;
   }
 
-  // Jei vartotojas neautentifikuotas – grąžiname null (router jau nukreipė, bet saugumui)
   if (!user) {
-    return null
+    return null;
   }
 
   return (
@@ -115,7 +157,7 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-8">Nustatymai</h1>
 
       <div className="space-y-6">
-        {/* Valiutos pasirinkimas */}
+        {/* Valiuta */}
         <Card>
           <CardHeader>
             <CardTitle>Pagrindinė valiuta</CardTitle>
@@ -127,13 +169,19 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <Label className="w-32">Valiuta</Label>
-                <Select value={selectedValiuta} onValueChange={setSelectedValiuta}>
+                <Select
+                  value={selectedValiuta}
+                  onValueChange={setSelectedValiuta}
+                >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Pasirinkite valiutą" />
                   </SelectTrigger>
                   <SelectContent>
                     {valiutos.map((v) => (
-                      <SelectItem key={v.id_valiuta} value={String(v.id_valiuta)}>
+                      <SelectItem
+                        key={v.id_valiuta}
+                        value={String(v.id_valiuta)}
+                      >
                         {v.name}
                       </SelectItem>
                     ))}
@@ -143,20 +191,29 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-        {/* Pranešimų nustatymai (paliekame kaip dekoraciją kol kas) */}
+
+        {/* Pranešimai */}
         <Card>
           <CardHeader>
             <CardTitle>Pranešimų nustatymai</CardTitle>
-            <CardDescription>Valdykite, kaip norite gauti pranešimus</CardDescription>
+            <CardDescription>
+              Valdykite, kaip norite gauti pranešimus
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Bendrai */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>El. pašto pranešimai</Label>
-                  <p className="text-sm text-gray-600">Gauti pranešimus el. paštu</p>
+                  <p className="text-sm text-gray-600">
+                    Gauti pranešimus el. paštu
+                  </p>
                 </div>
-                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                />
               </div>
 
               <Separator />
@@ -164,54 +221,95 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Push pranešimai</Label>
-                  <p className="text-sm text-gray-600">Gauti pranešimus naršyklėje</p>
+                  <p className="text-sm text-gray-600">
+                    Gauti pranešimus naršyklėje
+                  </p>
                 </div>
-                <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+                <Switch
+                  checked={pushNotifications}
+                  onCheckedChange={setPushNotifications}
+                />
               </div>
 
               <Separator />
 
+              {/* Tipai */}
               <div className="space-y-4">
                 <Label className="text-base">Pranešimų tipai</Label>
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
-                    <Label>Grupės kvietimai</Label>
-                    <p className="text-sm text-gray-600">Kai esate pakviesti į grupę</p>
+                    <Label>Draugų kvietimai</Label>
+                    <p className="text-sm text-gray-600">
+                      Kai gaunate kvietimą draugauti
+                    </p>
                   </div>
-                  <Switch checked={groupInvites} onCheckedChange={setGroupInvites} />
+                  <Switch
+                    checked={friendRequests}
+                    onCheckedChange={setFriendRequests}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pl-4">
+                  <div className="space-y-0.5">
+                    <Label>Grupės kvietimai</Label>
+                    <p className="text-sm text-gray-600">
+                      Kai esate pakviesti į grupę
+                    </p>
+                  </div>
+                  <Switch
+                    checked={groupInvites}
+                    onCheckedChange={setGroupInvites}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
                     <Label>Naujos išlaidos</Label>
-                    <p className="text-sm text-gray-600">Kai pridedama nauja išlaida</p>
+                    <p className="text-sm text-gray-600">
+                      Kai pridedama nauja išlaida
+                    </p>
                   </div>
-                  <Switch checked={newExpenses} onCheckedChange={setNewExpenses} />
+                  <Switch
+                    checked={newExpenses}
+                    onCheckedChange={setNewExpenses}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
                     <Label>Mokėjimo priminimai</Label>
-                    <p className="text-sm text-gray-600">Priminimai apie nesumokėtas skolas</p>
+                    <p className="text-sm text-gray-600">
+                      Priminimai apie nesumokėtas skolas
+                    </p>
                   </div>
-                  <Switch checked={paymentReminders} onCheckedChange={setPaymentReminders} />
+                  <Switch
+                    checked={paymentReminders}
+                    onCheckedChange={setPaymentReminders}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
                     <Label>Žinutės</Label>
-                    <p className="text-sm text-gray-600">Naujos žinutės ir pokalbiai</p>
+                    <p className="text-sm text-gray-600">
+                      Naujos žinutės ir pokalbiai
+                    </p>
                   </div>
-                  <Switch checked={messages} onCheckedChange={setMessages} />
+                  <Switch
+                    checked={messages}
+                    onCheckedChange={setMessages}
+                  />
                 </div>
               </div>
             </div>
 
-            <Button onClick={handleSave}>Išsaugoti nustatymus</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saugoma..." : "Išsaugoti nustatymus"}
+            </Button>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
