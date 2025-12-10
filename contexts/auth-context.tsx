@@ -81,7 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("auth_user")
       }
-      console.error("Login failed:", err)
       throw err
     }
   }
