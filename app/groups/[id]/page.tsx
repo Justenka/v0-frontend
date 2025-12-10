@@ -65,8 +65,8 @@ export default function GroupPage() {
   const groupMembers = members.map((member) => ({
     id: member.id.toString(),
     name: member.name,
-    email: `${member.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-    role: "member" as UserRole, // TODO: gauti realią rolę iš backend'o
+    email: member.email,//`${member.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+    role: member.role,//"member" as UserRole, // TODO: gauti realią rolę iš backend'o
   }))
 
   useEffect(() => {

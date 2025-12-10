@@ -106,17 +106,56 @@ export const groupApi = {
     },
 
     // Add a member to a group
-    addMember: async (groupId: number, name: string) => {
+    /*addMember: async (groupId: number, name: string) => {
         const success = addMemberToGroup(groupId, name)
         if (!success) throw new Error("Failed to add member")
         return getGroupById(groupId)
-    },
+    },*/
+
+        // Add a member to a group
+    addMember: async (groupId: number, nameOrEmail: string) => {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/members`, {
+    method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+        email: nameOrEmail.includes("@") ? nameOrEmail : undefined,
+        name: !nameOrEmail.includes("@") ? nameOrEmail : undefined,
+    }),
+})
+
+    const data = await res.json().catch(() => null)
+
+    if (!res.ok) {
+        const message = data?.message || "Nepavyko pridėti nario"
+        throw new Error(message)
+    }
+
+  return data.id_grupe ? data : await groupApi.getGroup(groupId)
+},
+
 
     // Remove a member from a group
-    removeMember: async (groupId: number, memberId: number) => {
+    /*removeMember: async (groupId: number, memberId: number) => {
         const success = removeMemberFromGroup(groupId, memberId)
         if (!success) throw new Error("Failed to remove member")
         return getGroupById(groupId)
+    },*/
+
+    // Remove a member from a group
+    removeMember: async (groupId: number, memberId: number) => {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/members/${memberId}`, {
+            method: "DELETE",
+        })
+
+        const data = await res.json().catch(() => null)
+
+        if (!res.ok) {
+            const message = data?.message || "Nepavyko pašalinti nario"
+            throw new Error(message)
+        }
+
+        // Grąžinam atnaujintą grupę
+        return await groupApi.getGroup(groupId)
     },
 
     // Add a transaction
@@ -141,9 +180,25 @@ export const groupApi = {
     },
 
     // Delete a group
-    deleteGroup: async (groupId: number) => {
+    /*eleteGroup: async (groupId: number) => {
         const success = deleteMockGroup(groupId)
         if (!success) throw new Error("Failed to delete group")
+        return true
+    },*/
+
+    // Delete a group
+    deleteGroup: async (groupId: number) => {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}`, {
+            method: "DELETE",
+        })
+
+        const data = await res.json().catch(() => null)
+
+        if (!res.ok) {
+            const message = data?.message || "Nepavyko ištrinti grupės"
+            throw new Error(message)
+        }
+
         return true
     },
 
