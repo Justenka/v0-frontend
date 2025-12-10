@@ -406,7 +406,13 @@ export default function GroupPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <MembersList members={members} onSettleUp={handleSettleUp} onRemoveMember={handleRemoveMember} />
+              <MembersList 
+              members={members} 
+              onSettleUp={handleSettleUp} 
+              onRemoveMember={handleRemoveMember} 
+              groupId={groupId}
+              onBalanceUpdate={refreshGroupData}
+              />
             </CardContent>
           </Card>
 

@@ -53,6 +53,7 @@ export default function MembersList({
 
     try {
       const userBalances = await groupApi.getUserBalances(groupId, Number(user.id))
+      console.log('Loaded balances:', userBalances)
       setBalances(userBalances)
     } catch (error) {
       console.error("Failed to load balances:", error)
@@ -60,7 +61,9 @@ export default function MembersList({
   }
 
   const getBalanceForMember = (memberId: number): Balance | null => {
-    return balances.find(b => b.userId === memberId) || null
+    const balance = balances.find(b => b.userId === memberId) || null
+    console.log(`Balance for member ${memberId}:`, balance)
+    return balance
   }
 
   const handleSettleUpClick = (member: Member) => {
@@ -98,6 +101,13 @@ export default function MembersList({
   }
 
   const formatCurrency = (amount: number, currency: string = "EUR"): string => {
+    // Handle invalid amounts
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return new Intl.NumberFormat("lt-LT", {
+        style: "currency",
+        currency: currency,
+      }).format(0)
+    }
     return new Intl.NumberFormat("lt-LT", {
       style: "currency",
       currency: currency,
@@ -108,10 +118,25 @@ export default function MembersList({
     const isCurrentUser = user && Number(user.id) === member.id
     const balance = getBalanceForMember(member.id)
 
+    // If no balance info from API, check member.balance
     if (!balance) {
-      return "Atsiskaityta"
+      // Check if member.balance exists and is a valid number
+      if (member.balance === undefined || member.balance === null || member.balance === 0) {
+        return "Atsiskaityta"
+      }
+
+      if (isCurrentUser) {
+        return member.balance > 0
+          ? `Jums priklauso ${formatCurrency(Math.abs(member.balance))}`
+          : `Jūs skolingi ${formatCurrency(Math.abs(member.balance))}`
+      }
+
+      return member.balance > 0
+        ? `Jums priklauso ${formatCurrency(Math.abs(member.balance))}`
+        : `Skolingas ${formatCurrency(Math.abs(member.balance))}`
     }
 
+    // Use balance from getUserBalances API
     if (isCurrentUser) {
       if (balance.type === 'owes_me') {
         return `Jums priklauso ${formatCurrency(balance.amount, balance.currency)}`
@@ -120,10 +145,8 @@ export default function MembersList({
       }
     } else {
       if (balance.type === 'owes_me') {
-        // Jiems priklauso (jie mums skolingi)
-        return `Jiems priklauso ${formatCurrency(balance.amount, balance.currency)}`
+        return `Jums priklauso ${formatCurrency(balance.amount, balance.currency)}`
       } else {
-        // Mes jiems skolingi
         return `Skolingas ${formatCurrency(balance.amount, balance.currency)}`
       }
     }
@@ -227,9 +250,17 @@ export default function MembersList({
   )
 }
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number, currency: string = "EUR"): string {
+  // Handle invalid amounts
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return new Intl.NumberFormat("lt-LT", {
+      style: "currency",
+      currency: currency,
+    }).format(0)
+  }
+  
   return new Intl.NumberFormat("lt-LT", {
     style: "currency",
-    currency: "EUR",
+    currency: currency,
   }).format(amount)
 }
