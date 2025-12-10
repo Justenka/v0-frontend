@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/sonner"
 export const metadata: Metadata = {
   title: "Skolų Departamentas",
   description: "Valdykite grupinius mokėjimus ir skolas",
-  generator: "v0.dev",
 }
 
 export default function RootLayout({
