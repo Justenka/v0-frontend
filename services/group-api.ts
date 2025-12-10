@@ -15,6 +15,39 @@ import { UserRole } from "@/types/user";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
 export const groupApi = {
+
+      async convertCurrency(
+    amount: number, 
+    fromCurrencyId: number, 
+    toCurrencyId: number
+  ): Promise<number> {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+    
+    const res = await fetch(
+      `${API_BASE}/api/valiutos/convert?amount=${amount}&fromCurrency=${fromCurrencyId}&toCurrency=${toCurrencyId}`
+    )
+    
+    if (!res.ok) {
+      throw new Error("Nepavyko konvertuoti valiutos")
+    }
+    
+    const data = await res.json()
+    return data.amount
+  },
+
+  async getAllCurrencies(): Promise<Array<{ id_valiuta: number; name: string; santykis: number }>> {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+    
+    const res = await fetch(`${API_BASE}/api/valiutos`)
+    
+    if (!res.ok) {
+      throw new Error("Nepavyko gauti valiutų")
+    }
+    
+    return res.json()
+  },
+
+  
     // Get a specific group by ID – tikras backend'as
     getGroup: async (groupId: number) => {
         const res = await fetch(`${API_BASE}/api/groups/${groupId}`)
