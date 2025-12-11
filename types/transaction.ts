@@ -8,11 +8,15 @@ export interface Transaction {
   currency?: string
   lateFee?: number
   lateFeeDays?: number
-  categoryId?: string // Added category support
-  categoryName?: string;
+  categoryId?: string
+  categoryName?: string
 }
 
 export interface TransactionWithSplits extends Transaction {
+  paidById?: number // Added - the user ID who paid
+  paidByUserId?: number // Backend returns this field
+  paidByName?: string // Backend also returns the payer's name
+  description?: string // Backend returns this too
   splits: {
     id: number
     userId: number

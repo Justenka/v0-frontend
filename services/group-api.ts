@@ -246,7 +246,7 @@ export const groupApi = {
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({ message: 'Serverio klaida' }));
-            throw new Error(err.message || 'Nepavyko sukurti skolos');
+            return Promise.reject(new Error(err.message || 'Nepavyko sukurti skolos'));
         }
 
         return response.json();
@@ -432,5 +432,30 @@ export const groupApi = {
             } as Activity
         })
     },
+
+
+    async checkDuplicateDebtName(
+    groupId: number, 
+    title: string, 
+    excludeDebtId?: number
+  ): Promise<{ exists: boolean; debtId?: number }> {
+    const params = new URLSearchParams({
+      groupId: String(groupId),
+      title: title.trim(),
+    });
+    
+    if (excludeDebtId) {
+      params.append('excludeDebtId', String(excludeDebtId));
+    }
+
+    const res = await fetch(`${API_BASE}/api/debts/check-duplicate?${params}`);
+    
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Nepavyko patikrinti dublikatų");
+    }
+    
+    return res.json();
+  },
 
 }

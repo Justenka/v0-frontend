@@ -20,6 +20,7 @@ import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import { Stepper, StepContent } from "@/components/ui/stepper"
 import { getSupportedCurrencies, type Currency } from "@/lib/currency-api"
+import { ca } from "date-fns/locale"
 
 export default function NaujaIslaidaPuslapis() {
   const params = useParams()
@@ -28,6 +29,7 @@ export default function NaujaIslaidaPuslapis() {
   const { user, isLoading } = useAuth()
 
   const [title, setTitle] = useState("")
+  const [titleError, setTitleError] = useState("") // NAUJAS
   const [amount, setAmount] = useState("")
   const [paidBy, setPaidBy] = useState("")
   const [splitType, setSplitType] = useState("equal")
@@ -105,7 +107,7 @@ export default function NaujaIslaidaPuslapis() {
   const canGoToNextStep = () => {
     switch (currentStep) {
       case 0:
-        return title.trim() !== "" && amount.trim() !== "" && Number.parseFloat(amount) > 0
+        return title.trim() !== "" && amount.trim() !== "" && Number.parseFloat(amount) > 0 && categoryId !== ""
       case 1:
         return paidBy !== ""
       case 2:
@@ -177,7 +179,7 @@ export default function NaujaIslaidaPuslapis() {
 
       await groupApi.createDebt({
         groupId,
-        title,
+        title: title.trim(), // PRIDĖTA .trim()
         description: "",
         amount: Number.parseFloat(amount),
         currencyCode: currency,
@@ -195,7 +197,15 @@ export default function NaujaIslaidaPuslapis() {
       router.push(`/groups/${groupId}`)
     } catch (error: any) {
       console.error("Klaida kuriant išlaidą:", error)
-      toast.error(error.message || "Nepavyko pridėti išlaidos")
+
+      // Patikriname ar tai duplikato klaida
+      if (error.message.includes("jau egzistuoja")) {
+        setTitleError(error.message)
+        toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
+        setCurrentStep(0) // Grįžtame į pirmą žingsnį
+      } else {
+        toast.error(error.message || "Nepavyko pridėti išlaidos")
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -277,9 +287,16 @@ export default function NaujaIslaidaPuslapis() {
                     id="title"
                     placeholder="pvz., Vakarienė, Kuras, Bilietai į kiną"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTitle(e.target.value)
+                      setTitleError("") // Išvalome klaidą kai vartotojas rašo
+                    }}
+                    className={titleError ? "border-red-500 focus-visible:ring-red-500" : ""}
                     required
                   />
+                  {titleError && (
+                    <p className="text-sm text-red-500 mt-1">{titleError}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-[1fr_auto] gap-2">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 import type { Transaction } from "@/types/transaction"
 import type { Member } from "@/types/member"
 import { toast } from "sonner"
@@ -27,6 +29,7 @@ interface EditTransactionDialogProps {
   members: Member[]
   categories: Array<{ id: string; name: string }>
   onSave: () => void
+  groupId: number // Add this prop
 }
 
 export function EditTransactionDialog({
@@ -36,6 +39,7 @@ export function EditTransactionDialog({
   members,
   categories,
   onSave,
+  groupId,
 }: EditTransactionDialogProps) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -49,6 +53,8 @@ export function EditTransactionDialog({
   const [fullDebtData, setFullDebtData] = useState<any>(null)
   const [supportedCurrencies, setSupportedCurrencies] = useState<Currency[]>([])
   const [loadingCurrencies, setLoadingCurrencies] = useState(true)
+  const [duplicateWarning, setDuplicateWarning] = useState(false)
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false)
 
   // Load currencies
   useEffect(() => {
@@ -74,6 +80,32 @@ export function EditTransactionDialog({
     }
   }, [transaction, open])
 
+  // Debounced duplicate check
+  useEffect(() => {
+    if (!title.trim() || !transaction) {
+      setDuplicateWarning(false)
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setCheckingDuplicate(true)
+        const result = await groupApi.checkDuplicateDebtName(
+          groupId,
+          title.trim(),
+          transaction.id
+        )
+        setDuplicateWarning(result.exists)
+      } catch (error) {
+        console.error("Error checking duplicate:", error)
+      } finally {
+        setCheckingDuplicate(false)
+      }
+    }, 500) // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId)
+  }, [title, groupId, transaction])
+
   const loadTransactionDetails = async () => {
     if (!transaction) return
 
@@ -86,6 +118,16 @@ export function EditTransactionDialog({
       setCurrency(debtData.currency || "EUR")
       setCategoryId(debtData.categoryId ? String(debtData.categoryId) : "")
 
+      // Set the payer
+      if (debtData.paidByUserId) {
+        setPaidByUserId(String(debtData.paidByUserId))
+      } else if (debtData.splits && debtData.splits.length > 0) {
+        const payer = debtData.splits.find((s: any) => s.role === 2)
+        if (payer) {
+          setPaidByUserId(String(payer.userId))
+        }
+      }
+
       // Set splits
       if (debtData.splits && debtData.splits.length > 0) {
         setSplits(debtData.splits.map((s: any) => ({
@@ -94,8 +136,22 @@ export function EditTransactionDialog({
           percentage: s.percentage || 0,
         })))
 
-        setSplitType("percentage")
+        const totalAmount = debtData.amount
+        const equalShare = totalAmount / debtData.splits.length
+        const tolerance = 0.01
         
+        const isEqual = debtData.splits.every((s: any) => 
+          Math.abs(s.amount - equalShare) < tolerance
+        )
+        
+        if (isEqual) {
+          setSplitType("equal")
+        } else {
+          const hasPercentages = debtData.splits.some((s: any) => 
+            s.percentage && s.percentage > 0
+          )
+          setSplitType(hasPercentages ? "percentage" : "custom")
+        }
       }
     } catch (error) {
       console.error("Failed to load transaction details:", error)
@@ -122,10 +178,14 @@ export function EditTransactionDialog({
       return
     }
 
+    if (duplicateWarning) {
+      toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
+      return
+    }
+
     setLoading(true)
 
     try {
-      // Calculate splits based on type
       let calculatedSplits: { userId: number; amount?: number; percentage?: number }[] = []
 
       if (splitType === "equal") {
@@ -188,7 +248,19 @@ export function EditTransactionDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Išlaidos pavadinimas"
+              className={duplicateWarning ? "border-red-500" : ""}
             />
+            {duplicateWarning && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Išlaida su tokiu pavadinimu jau egzistuoja šioje grupėje
+                </AlertDescription>
+              </Alert>
+            )}
+            {checkingDuplicate && (
+              <p className="text-xs text-muted-foreground">Tikrinama...</p>
+            )}
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -251,14 +323,16 @@ export function EditTransactionDialog({
               </SelectContent>
             </Select>
           </div>
-
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Atšaukti
           </Button>
-          <Button onClick={handleSave} disabled={loading || !title || !amount || !paidByUserId}>
+          <Button 
+            onClick={handleSave} 
+            disabled={loading || !title || !amount || !paidByUserId || duplicateWarning}
+          >
             {loading ? "Saugoma..." : "Išsaugoti"}
           </Button>
         </DialogFooter>
