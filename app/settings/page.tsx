@@ -196,7 +196,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             {/* Bendrai */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              {/* <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>El. pašto pranešimai</Label>
                   <p className="text-sm text-gray-600">
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                   checked={pushNotifications}
                   onCheckedChange={setPushNotifications}
                 />
-              </div>
+              </div> */}
 
               <Separator />
 
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between pl-4">
+                {/* <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
                     <Label>Grupės kvietimai</Label>
                     <p className="text-sm text-gray-600">
@@ -254,7 +254,7 @@ export default function SettingsPage() {
                     checked={groupInvites}
                     onCheckedChange={setGroupInvites}
                   />
-                </div>
+                </div> */}
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
