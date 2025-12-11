@@ -34,7 +34,7 @@ export default function NewGroupPage() {
 
     const ownerId = Number(user.id)
     if (Number.isNaN(ownerId)) {
-      console.error("[v0] Owner ID is not a valid number:", user.id)
+      console.error("Owner ID is not a valid number:", user.id)
       toast.error("Įvyko klaida nustatant vartotojo ID")
       return
     }
@@ -42,12 +42,12 @@ export default function NewGroupPage() {
     setIsSubmitting(true)
 
     try {
-      console.log("[v0] Creating group:", { title, ownerId })
+      console.log("Creating group:", { title, ownerId })
 
       // jei neturi aprašo lauko – nesiunčiam jo visai (undefined)
       const newGroup = await groupApi.createGroupBackend(title, ownerId)
 
-      console.log("[v0] Group created successfully:", newGroup)
+      console.log("Group created successfully:", newGroup)
       toast.success("Grupė sėkmingai sukurta!")
 
       // Pas tave "/" atrodo yra grupių sąrašas (sprendžiant iš teksto),
@@ -55,7 +55,7 @@ export default function NewGroupPage() {
       router.push("/")
       router.refresh()
     } catch (error) {
-      console.error("[v0] Failed to create group:", error)
+      console.error("Failed to create group:", error)
       toast.error("Nepavyko sukurti grupės. Bandykite dar kartą.")
     } finally {
       setIsSubmitting(false)

@@ -114,10 +114,10 @@ export const groupApi = {
     },*/
 
         // Add a member to a group
-    addMember: async (groupId: number, nameOrEmail: string) => {
+    addMember: async (groupId: number, nameOrEmail: string, actorId: number) => {
         const res = await fetch(`${API_BASE}/api/groups/${groupId}/members`, {
     method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-id": String(actorId) },
         body: JSON.stringify({
         email: nameOrEmail.includes("@") ? nameOrEmail : undefined,
         name: !nameOrEmail.includes("@") ? nameOrEmail : undefined,

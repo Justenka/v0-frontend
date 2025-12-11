@@ -192,6 +192,11 @@ export default function GroupPage() {
 }, [groupId, router, user, isLoading])
 
   const handleAddMember = async (name: string): Promise<boolean> => {
+    if (!user) {
+      toast.error("Neprisijungęs vartotojas")
+      return false
+    }
+    
     if (userRole === "guest") {
       alert("Svečiai negali pridėti narių")
       return false
@@ -205,7 +210,7 @@ export default function GroupPage() {
         return false
       }
 
-      const updatedGroup = await groupApi.addMember(groupId, name)
+      const updatedGroup = await groupApi.addMember(groupId, name, Number(user.id))
       if (updatedGroup) {
         setMembers(updatedGroup.members)
         setIsAddMemberOpen(false)
