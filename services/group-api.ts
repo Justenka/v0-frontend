@@ -357,25 +357,28 @@ export const groupApi = {
 
     // Make a partial payment
     async makePayment(data: {
-        groupId: number;
-        fromUserId: number;
-        toUserId: number;
-        amount: number;
-        currencyCode?: string;
-        note?: string;
-    }): Promise<{ message: string; paymentId: number }> {
-        const res = await fetch(`${API_BASE}/api/payments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        })
+    groupId: number;
+    fromUserId: number;
+    toUserId: number;
+    amount: number;
+    currencyCode?: string;
+    note?: string;
+    }): Promise<{ message: string; amountPaid: number }> {
+    const res = await fetch(`${API_BASE}/api/payments`, {
+        method: "POST",
+        headers: {
+        "Content-Type": "application/json",
+        "x-user-id": String(data.fromUserId),
+        },
+        body: JSON.stringify(data),
+    })
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.message || "Nepavyko įrašyti mokėjimo")
-        }
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || "Nepavyko įrašyti mokėjimo")
+    }
 
-        return res.json()
+    return res.json()
     },
 
     // Get payment history
