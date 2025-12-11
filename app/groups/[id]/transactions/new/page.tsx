@@ -187,7 +187,9 @@ export default function NaujaIslaidaPuslapis() {
         splits,
         lateFeeAmount: enableLateFee && lateFeeAmount ? Number.parseFloat(lateFeeAmount) : undefined,
         lateFeeAfterDays: enableLateFee ? Number(lateFeeDays) : undefined,
-      })
+      },
+      Number(user.id),
+      )
 
       toast.success("Išlaida sėkmingai pridėta!")
       router.push(`/groups/${groupId}`)

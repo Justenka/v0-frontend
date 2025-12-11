@@ -143,9 +143,10 @@ export const groupApi = {
     },*/
 
     // Remove a member from a group
-    removeMember: async (groupId: number, memberId: number) => {
+    removeMember: async (groupId: number, memberId: number, actorId: number) => {
         const res = await fetch(`${API_BASE}/api/groups/${groupId}/members/${memberId}`, {
             method: "DELETE",
+            headers: { "x-user-id": String(actorId) },
         })
 
         const data = await res.json().catch(() => null)
@@ -236,10 +237,10 @@ export const groupApi = {
         splits: { userId: number; amount?: number; percentage?: number }[];
         lateFeeAmount?: number;
         lateFeeAfterDays?: number;
-    }) {
+    }, actorId: number,) {
         const response = await fetch(`${API_BASE}/api/debts`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-user-id': String(actorId),},
             body: JSON.stringify(data),
         });
 

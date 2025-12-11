@@ -196,7 +196,7 @@ export default function GroupPage() {
       toast.error("Neprisijungęs vartotojas")
       return false
     }
-    
+
     if (userRole === "guest") {
       alert("Svečiai negali pridėti narių")
       return false
@@ -224,12 +224,17 @@ export default function GroupPage() {
   }
 
   const handleRemoveMember = async (memberId: number) => {
+    if (!user) {
+      toast.error("Neprisijungęs vartotojas")
+      return false
+    }
+
     if (userRole !== "admin") {
       alert("Tik administratoriai gali šalinti narius")
       return
     }
 
-    await groupApi.removeMember(groupId, memberId)
+    await groupApi.removeMember(groupId, memberId, Number(user.id))
     setMembers((prev) => prev.filter((m) => m.id !== memberId))
   }
 
