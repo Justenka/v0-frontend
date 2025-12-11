@@ -14,6 +14,7 @@ export interface Activity {
   groupId: number
   userId: number | null
   userName: string
+  userAvatar?: string | null
   type: ActivityType
   description: string
   timestamp: Date

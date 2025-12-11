@@ -21,10 +21,11 @@ import {
   ArrowLeftCircle,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { groupApi } from "@/services/group-api"
 import type { Activity, ActivityType } from "@/types/activity"
+import type { UserRole } from "@/types/user"
 import { formatDistanceToNow } from "date-fns"
 import { lt } from "date-fns/locale"
-import { groupApi } from "@/services/group-api"
 
 const activityIcons: Record<ActivityType, any> = {
   group_created: Users,
@@ -53,99 +54,100 @@ const activityColors: Record<ActivityType, string> = {
 export default function GroupHistoryPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
-  const groupIdParam = params?.id as string
-  const groupIdNum = Number.parseInt(groupIdParam, 10)
+  const groupId = params?.id as string
 
+  // ⬇️ PAKEISTA: pasiimam ir isLoading
+  const { user, isLoading } = useAuth()
+
+  const [activities, setActivities] = useState<Activity[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [userRole, setUserRole] = useState<UserRole>("guest")
   const [loading, setLoading] = useState(true)
 
-  // Guard + fetch role + history
+  const isAdmin = userRole === "admin"
+
+  // 1) Auth guard su isLoading
   useEffect(() => {
+    if (isLoading) return          // dar nieko nežinom
     if (!user) {
       router.push("/login")
-      return
     }
+  }, [isLoading, user, router])
 
-    if (!groupIdNum || Number.isNaN(groupIdNum)) {
-      router.push("/")
-      return
-    }
-
-    let cancelled = false
+  // 2) Užkraunam rolę ir istoriją tik kai turim user
+  useEffect(() => {
+    if (isLoading || !user || !groupId) return
 
     const load = async () => {
       try {
-        setLoading(true)
+        // rolė
+        const role = await groupApi.getUserRoleInGroup(
+          Number(groupId),
+          Number(user.id),
+        )
+        setUserRole(role)
 
-        // 1) Rolė grupėje
-        const userId = Number(user.id)
-        const role = await groupApi.getUserRoleInGroup(groupIdNum, userId)
-        if (!cancelled) {
-          setIsAdmin(role === "admin")
-        }
-
+        // jeigu ne admin – numetam į grupės puslapį
         if (role !== "admin") {
           alert("Tik administratoriai gali peržiūrėti grupės istoriją")
-          router.push(`/groups/${groupIdNum}`)
+          router.push(`/groups/${groupId}`)
           return
         }
 
-        // 2) Istorija
-        const history = await groupApi.getGroupHistory(groupIdNum)
-        if (!cancelled) {
-          setActivities(history)
-        }
+        // istorija
+        const data = await groupApi.getGroupHistory(Number(groupId))
+        setActivities(data)
       } catch (err) {
-        console.error("Nepavyko įkelti grupės istorijos:", err)
+        console.error("Nepavyko užkrauti grupės istorijos:", err)
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
     }
 
     void load()
+  }, [isLoading, user, groupId, router])
 
-    return () => {
-      cancelled = true
-    }
-  }, [user, groupIdNum, router])
+  // kol kraunam auth ar istoriją – nieko nerenderinam (be redirect’o)
+  if (isLoading || loading) {
+    return null
+  }
 
-  if (!user) return null
-  if (isAdmin === false) return null // kol redirectas suveikia
+  // jei vis tiek nėra user (bet redirect jau paleistas) – nerodom nieko
+  if (!user) {
+    return null
+  }
 
-  const filteredActivities = useMemo(
-    () =>
-      activities.filter((activity) => {
-        const matchesSearch =
-          activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          activity.userName.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesType = filterType === "all" || activity.type === filterType
-        return matchesSearch && matchesType
-      }),
-    [activities, searchQuery, filterType],
+  // --- FILTRAVIMAS ---
+
+  const filteredActivities = activities.filter((activity) => {
+    const matchesSearch =
+      activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      activity.userName.toLowerCase().includes(searchQuery.toLowerCase())
+
+    const matchesType = filterType === "all" || activity.type === filterType
+
+    return matchesSearch && matchesType
+  })
+
+  const sortedActivities = [...filteredActivities].sort(
+    (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
   )
 
-  const sortedActivities = useMemo(
-    () => [...filteredActivities].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()),
-    [filteredActivities],
-  )
-
-  const groupedActivities = useMemo(
-    () =>
-      sortedActivities.reduce((acc, activity) => {
-        const date = activity.timestamp.toLocaleDateString("lt-LT", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
-        if (!acc[date]) acc[date] = []
-        acc[date].push(activity)
-        return acc
-      }, {} as Record<string, Activity[]>),
-    [sortedActivities],
+  const groupedActivities = sortedActivities.reduce(
+    (acc, activity) => {
+      const date = activity.timestamp.toLocaleDateString("lt-LT", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+      if (!acc[date]) {
+        acc[date] = []
+      }
+      acc[date].push(activity)
+      return acc
+    },
+    {} as Record<string, Activity[]>,
   )
 
   const getInitials = (name: string) =>
@@ -158,7 +160,7 @@ export default function GroupHistoryPage() {
   return (
     <div className="container max-w-4xl py-10">
       <Link
-        href={`/groups/${groupIdParam}`}
+        href={`/groups/${groupId}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center mb-6"
       >
         <ArrowLeftCircle className="mr-2 h-4 w-4" />
@@ -173,7 +175,7 @@ export default function GroupHistoryPage() {
         <p className="text-gray-600">Peržiūrėkite visą veiklą šioje grupėje</p>
       </div>
 
-      {/* Filters */}
+      {/* FILTRAI */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -202,12 +204,12 @@ export default function GroupHistoryPage() {
       </div>
 
       <p className="text-sm text-gray-600 mb-4">
-        {loading ? "Kraunama..." : `Rasta ${sortedActivities.length} įrašų`}
+        Rasta {sortedActivities.length} įrašų
       </p>
 
-      {/* Activity Timeline */}
+      {/* TIMELINE */}
       <div className="space-y-8">
-        {Object.entries(groupedActivities).length === 0 && !loading ? (
+        {Object.entries(groupedActivities).length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <History className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -215,37 +217,57 @@ export default function GroupHistoryPage() {
             </CardContent>
           </Card>
         ) : (
-          Object.entries(groupedActivities).map(([date, activities]) => (
+          Object.entries(groupedActivities).map(([date, activitiesForDay]) => (
             <div key={date}>
-              <h3 className="text-sm font-semibold text-gray-500 mb-3 sticky top-0 bg-gray-50 py-2">{date}</h3>
+              <h3 className="text-sm font-semibold text-gray-500 mb-3 sticky top-0 bg-gray-50 py-2">
+                {date}
+              </h3>
               <div className="space-y-3">
-                {activities.map((activity) => {
+                {activitiesForDay.map((activity) => {
                   const Icon = activityIcons[activity.type]
                   const colorClass = activityColors[activity.type]
 
                   return (
-                    <Card key={activity.id} className="hover:shadow-md transition-shadow">
+                    <Card
+                      key={activity.id}
+                      className="hover:shadow-md transition-shadow"
+                    >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
-                          <div className={`p-2 rounded-full ${colorClass} shrink-0`}>
+                          <div
+                            className={`p-2 rounded-full ${colorClass} shrink-0`}
+                          >
                             <Icon className="h-5 w-5" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Avatar className="h-6 w-6">
-                                  <AvatarImage src="/placeholder.svg" alt={activity.userName} />
+                                  <AvatarImage
+                                    src={activity.userAvatar || "/placeholder.svg"}
+                                    alt={activity.userName}
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).src = "/placeholder.svg"
+                                    }}
+                                  />
                                   <AvatarFallback className="text-xs">
                                     {getInitials(activity.userName)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="font-medium text-sm">{activity.userName}</span>
+                                <span className="font-medium text-sm">
+                                  {activity.userName}
+                                </span>
                               </div>
                               <span className="text-xs text-gray-500 shrink-0">
-                                {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: lt })}
+                                {formatDistanceToNow(activity.timestamp, {
+                                  addSuffix: true,
+                                  locale: lt,
+                                })}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-700">{activity.description}</p>
+                            <p className="text-sm text-gray-700">
+                              {activity.description}
+                            </p>
                           </div>
                         </div>
                       </CardContent>

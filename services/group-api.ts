@@ -400,16 +400,33 @@ export const groupApi = {
 
         const data = await res.json()
 
-        return (data.activities || []).map((a: any) => ({
+        return (data.activities || []).map((a: any) => {
+            // normalizuojam avatar kelią taip pat kaip ir kitur
+            let avatar: string | null = a.userAvatar ?? null
+
+            if (avatar) {
+            // jeigu DB saugo tik failo pavadinimą
+            if (!avatar.startsWith("/")) {
+                avatar = `/uploads/avatars/${avatar}`
+            }
+            // jeigu dar nėra pilno hosto
+            if (!avatar.startsWith("http://") && !avatar.startsWith("https://")) {
+                avatar = `${API_BASE}${avatar}`
+            }
+            }
+
+            return {
             id: a.id,
             groupId: a.groupId,
             userId: a.userId ?? null,
             userName: a.userName,
+            userAvatar: avatar,
             type: a.type,
             description: a.description,
             timestamp: new Date(a.timestamp),
             metadata: a.metadata ? JSON.parse(a.metadata) : undefined,
-        }))
+            } as Activity
+        })
     },
 
 }

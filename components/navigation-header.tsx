@@ -45,11 +45,6 @@ export function NavigationHeader() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [hasNewMessages, setHasNewMessages] = useState(false)
 
-  // Nerodom header login/register puslapiuose
-  if (pathname === "/login" || pathname === "/register") {
-    return null
-  }
-
   const handleLogout = () => {
     logout()
     router.push("/login")
@@ -150,6 +145,10 @@ export function NavigationHeader() {
       if (intervalId) clearInterval(intervalId)
     }
   }, [user])
+
+  if (pathname === "/login" || pathname === "/register") {
+    return null
+  }
 
   return (
     <header className="border-b bg-white sticky top-0 z-50">
