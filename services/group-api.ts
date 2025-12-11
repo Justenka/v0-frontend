@@ -4,6 +4,7 @@ import type { Group } from "@/types/group"
 import type { Category } from "@/types/category";
 import type { Transaction, TransactionWithSplits } from "@/types/transaction";
 import type { Payment } from "@/types/payment";
+import type { Activity } from "@/types/activity"
 import {
   getGroupById,
   addMemberToGroup,
@@ -385,6 +386,29 @@ export const groupApi = {
         }
         
         return res.json()
+    },
+
+    async getGroupHistory(groupId: number): Promise<Activity[]> {
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/history`, {
+            cache: "no-store",
+        })
+
+        if (!res.ok) {
+            throw new Error("Nepavyko gauti grupės istorijos")
+        }
+
+        const data = await res.json()
+
+        return (data.activities || []).map((a: any) => ({
+            id: a.id,
+            groupId: a.groupId,
+            userId: a.userId ?? null,
+            userName: a.userName,
+            type: a.type,
+            description: a.description,
+            timestamp: new Date(a.timestamp),
+            metadata: a.metadata ? JSON.parse(a.metadata) : undefined,
+        }))
     },
 
 }

@@ -10,13 +10,12 @@ export type ActivityType =
   | "permission_changed"
 
 export interface Activity {
-  id: string
-  groupId?: string
-  userId: string
+  id: number
+  groupId: number
+  userId: number | null
   userName: string
   type: ActivityType
   description: string
   timestamp: Date
-  metadata?: Record<string, any>
+  metadata?: any
 }
-

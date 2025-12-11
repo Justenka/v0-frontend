@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,11 +20,11 @@ import {
   Shield,
   ArrowLeftCircle,
 } from "lucide-react"
-import { mockActivities, mockGroupPermissions } from "@/lib/mock-data"
 import { useAuth } from "@/contexts/auth-context"
 import type { Activity, ActivityType } from "@/types/activity"
 import { formatDistanceToNow } from "date-fns"
 import { lt } from "date-fns/locale"
+import { groupApi } from "@/services/group-api"
 
 const activityIcons: Record<ActivityType, any> = {
   group_created: Users,
@@ -54,72 +54,111 @@ export default function GroupHistoryPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
-  const groupId = params?.id as string
+  const groupIdParam = params?.id as string
+  const groupIdNum = Number.parseInt(groupIdParam, 10)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const currentUserPermission = mockGroupPermissions.find((p) => p.groupId === groupId && p.userId === user?.id)
-  const isAdmin = currentUserPermission?.role === "admin"
-
+  // Guard + fetch role + history
   useEffect(() => {
     if (!user) {
       router.push("/login")
       return
     }
 
-    if (!isAdmin) {
-      alert("Tik administratoriai gali peržiūrėti grupės istoriją")
-      router.push(`/groups/${groupId}`)
+    if (!groupIdNum || Number.isNaN(groupIdNum)) {
+      router.push("/")
+      return
     }
-  }, [user, isAdmin, router, groupId])
 
-  if (!user || !isAdmin) {
-    return null
-  }
+    let cancelled = false
 
-  const groupActivities = mockActivities.filter((activity) => activity.groupId === groupId)
+    const load = async () => {
+      try {
+        setLoading(true)
 
-  // Filter activities by search and type
-  const filteredActivities = groupActivities.filter((activity) => {
-    const matchesSearch =
-      activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      activity.userName.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = filterType === "all" || activity.type === filterType
-    return matchesSearch && matchesType
-  })
+        // 1) Rolė grupėje
+        const userId = Number(user.id)
+        const role = await groupApi.getUserRoleInGroup(groupIdNum, userId)
+        if (!cancelled) {
+          setIsAdmin(role === "admin")
+        }
 
-  // Sort by timestamp (newest first)
-  const sortedActivities = [...filteredActivities].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        if (role !== "admin") {
+          alert("Tik administratoriai gali peržiūrėti grupės istoriją")
+          router.push(`/groups/${groupIdNum}`)
+          return
+        }
 
-  // Group activities by date
-  const groupedActivities = sortedActivities.reduce(
-    (acc, activity) => {
-      const date = activity.timestamp.toLocaleDateString("lt-LT", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-      if (!acc[date]) {
-        acc[date] = []
+        // 2) Istorija
+        const history = await groupApi.getGroupHistory(groupIdNum)
+        if (!cancelled) {
+          setActivities(history)
+        }
+      } catch (err) {
+        console.error("Nepavyko įkelti grupės istorijos:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      acc[date].push(activity)
-      return acc
-    },
-    {} as Record<string, Activity[]>,
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, groupIdNum, router])
+
+  if (!user) return null
+  if (isAdmin === false) return null // kol redirectas suveikia
+
+  const filteredActivities = useMemo(
+    () =>
+      activities.filter((activity) => {
+        const matchesSearch =
+          activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          activity.userName.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesType = filterType === "all" || activity.type === filterType
+        return matchesSearch && matchesType
+      }),
+    [activities, searchQuery, filterType],
   )
 
-  const getInitials = (name: string) => {
-    return name
+  const sortedActivities = useMemo(
+    () => [...filteredActivities].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()),
+    [filteredActivities],
+  )
+
+  const groupedActivities = useMemo(
+    () =>
+      sortedActivities.reduce((acc, activity) => {
+        const date = activity.timestamp.toLocaleDateString("lt-LT", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+        if (!acc[date]) acc[date] = []
+        acc[date].push(activity)
+        return acc
+      }, {} as Record<string, Activity[]>),
+    [sortedActivities],
+  )
+
+  const getInitials = (name: string) =>
+    name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-  }
 
   return (
     <div className="container max-w-4xl py-10">
       <Link
-        href={`/groups/${groupId}`}
+        href={`/groups/${groupIdParam}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center mb-6"
       >
         <ArrowLeftCircle className="mr-2 h-4 w-4" />
@@ -162,12 +201,13 @@ export default function GroupHistoryPage() {
         </Select>
       </div>
 
-      {/* Results count */}
-      <p className="text-sm text-gray-600 mb-4">Rasta {sortedActivities.length} įrašų</p>
+      <p className="text-sm text-gray-600 mb-4">
+        {loading ? "Kraunama..." : `Rasta ${sortedActivities.length} įrašų`}
+      </p>
 
       {/* Activity Timeline */}
       <div className="space-y-8">
-        {Object.entries(groupedActivities).length === 0 ? (
+        {Object.entries(groupedActivities).length === 0 && !loading ? (
           <Card>
             <CardContent className="py-12 text-center">
               <History className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -195,7 +235,9 @@ export default function GroupHistoryPage() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Avatar className="h-6 w-6">
                                   <AvatarImage src="/placeholder.svg" alt={activity.userName} />
-                                  <AvatarFallback className="text-xs">{getInitials(activity.userName)}</AvatarFallback>
+                                  <AvatarFallback className="text-xs">
+                                    {getInitials(activity.userName)}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <span className="font-medium text-sm">{activity.userName}</span>
                               </div>
