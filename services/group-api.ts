@@ -317,6 +317,7 @@ export const groupApi = {
             amount: number;
             currencyCode: string;
             categoryId?: string;
+            paidById?: number; 
             splits?: { userId: number; amount?: number; percentage?: number }[];
             userId: number;
         }

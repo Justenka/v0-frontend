@@ -154,6 +154,7 @@ export function EditTransactionDialog({
         amount: updatedAmount,
         currencyCode: currency,
         categoryId,
+        paidById: Number(paidByUserId),
         splits: calculatedSplits,
         userId: Number(user.id),
       })
