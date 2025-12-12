@@ -310,39 +310,36 @@ export const groupApi = {
     },
 
     // Update debt (edit transaction)
-    async updateDebt(
-        debtId: number,
-        data: {
-            title: string;
-            description?: string;
-            amount: number;
-            currencyCode: string;
-            categoryId?: string;
-            paidById?: number; 
-            splits?: { userId: number; amount?: number; percentage?: number }[];
-            userId: number;
-        }
-    ) {
-        const res = await fetch(`${API_BASE}/api/debts/${debtId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        })
+async updateDebt(
+    debtId: number,
+    data: {
+        title: string;
+        categoryId?: string;
+        userId: number;
+    }
+) {
+    const res = await fetch(`${API_BASE}/api/debts/${debtId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.message || "Nepavyko atnaujinti skolos")
-        }
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || "Nepavyko atnaujinti skolos")
+    }
 
-        return res.json()
-    },
+    return res.json()
+},
 
     // Get balances for a user in a group
     async getUserBalances(groupId: number, userId: number): Promise<{
         userId: number;
         userName: string;
         amount: number;
+        amountEUR: number;
         currency: string;
+        kursasEurui: number;
         type: 'owes_me' | 'i_owe';
     }[]> {
         const res = await fetch(`${API_BASE}/api/groups/${groupId}/balances/${userId}`)

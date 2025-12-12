@@ -149,7 +149,13 @@ export default function GroupPage() {
             ? "EUR"
             : d.valiutos_kodas === 2
             ? "USD"
-            : "PLN",
+            : d.valiutos_kodas === 3
+            ? "PLN"
+            : d.valiutos_kodas === 4
+            ? "GBP"
+            : d.valiutos_kodas === 5
+            ? "JPY"
+            : "UNKNOWN",
         date: d.sukurimo_data,
         paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
         categoryId: d.kategorija ? String(d.kategorija) : null,
@@ -272,7 +278,12 @@ export default function GroupPage() {
         amount: Number(d.suma),
         currency:
           d.valiutos_kodas === 1 ? "EUR" :
-            d.valiutos_kodas === 2 ? "USD" : "PLN",
+            d.valiutos_kodas === 2 ? "USD" : 
+            d.valiutos_kodas === 3 ? "PLN" :
+            d.valiutos_kodas === 4 ? "GBP" :
+            d.valiutos_kodas === 5 ? "JPY" :
+            "UNKNOWN",
+
         date: d.sukurimo_data,
         paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
         categoryId: d.kategorija ? String(d.kategorija) : null,
@@ -507,8 +518,8 @@ export default function GroupPage() {
         open={editDialog.open}
         onOpenChange={(open) => setEditDialog({ open, transaction: null })}
         transaction={editDialog.transaction}
-        members={members}
         categories={categories}
+        groupId={groupId}
         onSave={handleSaveEdit}
       />
 
