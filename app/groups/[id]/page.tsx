@@ -492,6 +492,7 @@ export default function GroupPage() {
         onOpenChange={setIsAddMemberOpen}
         onAddMember={handleAddMember}
         existingMembers={members}
+        groupId={groupId.toString()}
       />
 
       <GroupSettingsDialog

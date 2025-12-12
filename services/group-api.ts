@@ -134,6 +134,44 @@ export const groupApi = {
   return data.id_grupe ? data : await groupApi.getGroup(groupId)
 },
 
+createInvite: async (groupId: number, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/invites`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(actorId),
+    },
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.message || "Nepavyko sukurti kvietimo")
+  }
+
+  return data as { token: string; expiresAt: string }
+},
+
+acceptInvite: async (groupId: number, token: string, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/join`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(actorId),
+    },
+    body: JSON.stringify({ token }),
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.message || "Nepavyko prisijungti prie grupės")
+  }
+
+  return data as { ok: boolean; alreadyMember?: boolean }
+},
+
+
 
     // Remove a member from a group
     /*removeMember: async (groupId: number, memberId: number) => {
