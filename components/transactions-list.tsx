@@ -23,9 +23,10 @@ interface TransactionsListProps {
   categories: Array<{ id: string; name: string }>
   userRole: UserRole
   currentUserId?: number
+  groupId: number // Add groupId to props
   onEdit?: (transaction: Transaction) => void
   onDelete?: (transactionId: number) => Promise<void>
-  onSave?: () => void // Pridėkite šį tipą
+  onSave?: () => void
 }
 
 export default function TransactionsList({
@@ -34,6 +35,7 @@ export default function TransactionsList({
   categories,
   userRole,
   currentUserId,
+  groupId, // Receive groupId from parent
   onEdit,
   onDelete,
   onSave,
@@ -47,25 +49,27 @@ export default function TransactionsList({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   
-  // Valiutų konvertavimas
+  // Currency conversion
   const [userCurrency, setUserCurrency] = useState<{ id: number; name: string } | null>(null)
   const [convertedAmounts, setConvertedAmounts] = useState<Record<number, number>>({})
   const [isConverting, setIsConverting] = useState(false)
 
-  // Gauti vartotojo valiutą
+  // Get user currency
   useEffect(() => {
     const fetchUserCurrency = async () => {
       if (!user) return
       
       try {
-
         const userData = await fetch(`${API_BASE}/api/vartotojai/${user.id}`).then(r => r.json())
         const currencies = await groupApi.getAllCurrencies()
         
         const userCurr = currencies.find(c => c.id_valiuta === userData.valiutos_kodas)
         if (userCurr) {
           setUserCurrency({ id: userCurr.id_valiuta, name: userCurr.name })
-        }
+        } else {
+        // fallback if nothing is found
+        setUserCurrency({ id: 1, name: "EUR" })
+        } 
       } catch (error) {
         console.error("Nepavyko gauti vartotojo valiutos:", error)
       }
@@ -74,7 +78,7 @@ export default function TransactionsList({
     fetchUserCurrency()
   }, [user])
 
-  // Konvertuoti transakcijas į vartotojo valiutą
+  // Convert transactions to user currency
   useEffect(() => {
     const convertTransactions = async () => {
       if (!userCurrency || transactions.length === 0) return
@@ -84,7 +88,6 @@ export default function TransactionsList({
 
       try {
         for (const transaction of transactions) {
-          // Mapuojame valiutos kodą į id_valiuta
           const transactionCurrencyId = 
             transaction.currency === "EUR" ? 1 :
             transaction.currency === "USD" ? 2 :
@@ -93,10 +96,8 @@ export default function TransactionsList({
             transaction.currency === "JPY" ? 5 : 1
 
           if (transactionCurrencyId === userCurrency.id) {
-            // Ta pati valiuta, nereikia konvertuoti
             converted[transaction.id] = transaction.amount
           } else {
-            // Konvertuojame
             const convertedAmount = await groupApi.convertCurrency(
               transaction.amount,
               transactionCurrencyId,
@@ -172,9 +173,9 @@ export default function TransactionsList({
     setIsEditDialogOpen(true)
   }
 
-const handleSaveEdit = () => {
-    onSave?.(); // Kviečiame tėvinio komponento duomenų atnaujinimą
-    setIsEditDialogOpen(false);
+  const handleSaveEdit = () => {
+    onSave?.()
+    setIsEditDialogOpen(false)
   }
 
   const handleDelete = async (transaction: Transaction) => {
@@ -200,7 +201,6 @@ const handleSaveEdit = () => {
     }
   }
 
-  // Formatuojame sumą su vartotojo valiuta
   const formatAmount = (transaction: Transaction): string => {
     if (!userCurrency || isConverting) {
       return formatCurrency(transaction.amount, transaction.currency)
@@ -364,7 +364,6 @@ const handleSaveEdit = () => {
                               </Badge>
                             </>
                           )}
-                          {/* Originalios valiutos indikatorius */}
                           {transaction.currency !== userCurrency?.name && (
                             <>
                               <span className="text-gray-300">•</span>
@@ -398,9 +397,9 @@ const handleSaveEdit = () => {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         transaction={editingTransaction}
-        members={members}
         categories={categories}
         onSave={handleSaveEdit}
+        groupId={groupId}
       />
     </>
   )

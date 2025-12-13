@@ -14,6 +14,7 @@ import {
   MessageSquare,
   FileText,
   History,
+  Lock,
 } from "lucide-react"
 import type { Group } from "@/types/group"
 import type { Member } from "@/types/member"
@@ -43,7 +44,8 @@ export default function GroupPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [userRole, setUserRole] = useState<UserRole>("guest") // Pridėkite naują state
+  const [userRole, setUserRole] = useState<UserRole>("guest")
+  const [isPublicView, setIsPublicView] = useState(false) // NAUJAS STATE
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview")
@@ -53,20 +55,20 @@ export default function GroupPage() {
     transaction: Transaction | null
   }>({ open: false, transaction: null })
 
-  // Auth guard
+  // Auth guard - PAKEISTAS: nebenukreipia į login jei nėra user
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login")
+      // Jei nėra vartotojo, leidžiame viešą peržiūrą
+      setIsPublicView(true)
+      setUserRole("guest")
     }
-  }, [isLoading, user, router])
+  }, [isLoading, user])
 
-  // Mapinam narius settings dialogui
-  // Kol kas naudojame placeholder email ir role, vėliau reikės gauti iš backend'o
   const groupMembers = members.map((member) => ({
     id: member.id.toString(),
     name: member.name,
-    email: member.email,//`${member.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-    role: member.role,//"member" as UserRole, // TODO: gauti realią rolę iš backend'o
+    email: member.email,
+    role: member.role,
   }))
 
   useEffect(() => {
@@ -91,111 +93,84 @@ export default function GroupPage() {
   }
 
   useEffect(() => {
-  const fetchData = async () => {
-    // jei groupId neteisingas – išeinam
-    if (!groupId || Number.isNaN(groupId)) {
-      console.error("Group id is invalid")
-      setLoading(false)
-      return
-    }
-
-    // kol auth dar kraunasi – nieko nedarom
-    if (isLoading) return
-
-    // jei user nėra – nieko nefetchinam, auth guard viršuje pats nuves į /login
-    if (!user) return
-
-    try {
-      // Fetch globalios kategorijos
-      try {
-        const allCategories = await groupApi.getCategories()
-        setCategories(allCategories)
-      } catch (error) {
-        console.error("Nepavyko įkelti kategorijų:", error)
-      }
-
-      const userId = Number(user.id)
-      console.log("User role:", user.id)
-
-      try {
-        const role = await groupApi.getUserRoleInGroup(groupId, userId)
-        setUserRole(role)
-        console.log("User role in group:", role)
-      } catch (error) {
-        console.error("Nepavyko gauti vartotojo rolės:", error)
-        setUserRole("guest")
-      }
-
-      const backendGroups: BackendGroupForUser[] =
-        await groupApi.getUserGroupsBackend(userId)
-
-      const backendGroup = backendGroups.find((g) => g.id_grupe === groupId)
-      if (!backendGroup) {
-        console.error("Group not found in backend")
-        setGroup(null)
+    const fetchData = async () => {
+      if (!groupId || Number.isNaN(groupId)) {
+        console.error("Group id is invalid")
         setLoading(false)
         return
       }
 
-      const debts = await groupApi.getDebtsByGroup(groupId)
+      if (isLoading) return
 
-      const mappedTransactions = debts.map((d: any) => ({
-        id: d.id_skola,
-        title: d.pavadinimas,
-        description: d.aprasymas || "",
-        amount: Number(d.suma),
-        currency:
-          d.valiutos_kodas === 1
-            ? "EUR"
-            : d.valiutos_kodas === 2
-            ? "USD"
-            : d.valiutos_kodas === 3
-            ? "PLN"
-            : d.valiutos_kodas === 4
-            ? "GBP"
-            : d.valiutos_kodas === 5
-            ? "JPY"
-            : "UNKNOWN",
-        date: d.sukurimo_data,
-        paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
-        categoryId: d.kategorija ? String(d.kategorija) : null,
-        splitType: "Lygiai",
-      }))
+      try {
+        // Fetch globalios kategorijos
+        try {
+          const allCategories = await groupApi.getCategories()
+          setCategories(allCategories)
+        } catch (error) {
+          console.error("Nepavyko įkelti kategorijų:", error)
+        }
 
-      const groupData: Group = {
-        id: backendGroup.id_grupe,
-        title: backendGroup.pavadinimas,
-        description: backendGroup.aprasas ?? null,
-        createdAt: backendGroup.sukurimo_data,
+        // PAKEISTA LOGIKA: jei user yra, gauname rolę, jei ne - guest
+        if (user) {
+          const userId = Number(user.id)
+          
+          try {
+            const role = await groupApi.getUserRoleInGroup(groupId, userId)
+            setUserRole(role)
+            setIsPublicView(false)
+          } catch (error) {
+            console.error("Nepavyko gauti vartotojo rolės:", error)
+            setUserRole("guest")
+            setIsPublicView(true)
+          }
+        } else {
+          // Nėra user - viešas režimas
+          setIsPublicView(true)
+          setUserRole("guest")
+        }
 
-        ownerId: undefined,
-        ownerFirstName: backendGroup.owner_vardas,
-        ownerLastName: backendGroup.owner_pavarde,
-
-        role: backendGroup.role,
-        memberStatus: backendGroup.nario_busena,
-
-        members: [],
-        transactions: [],
-        balance: 0,
+        // Gauname grupės duomenis (dabar veikia ir be autentifikacijos)
+        const fullGroupData = await groupApi.getGroup(groupId)
+        setGroup(fullGroupData)
+        setMembers(fullGroupData.members || [])
+        
+        // Jei yra transactions iš backend (naujas endpoint turi juos)
+        if (fullGroupData.transactions) {
+          setTransactions(fullGroupData.transactions)
+        } else {
+          // Fallback - gauname per debts endpoint
+          const debts = await groupApi.getDebtsByGroup(groupId)
+          const mappedTransactions = debts.map((d: any) => ({
+            id: d.id_skola,
+            title: d.pavadinimas,
+            description: d.aprasymas || "",
+            amount: Number(d.suma),
+            currency:
+              d.valiutos_kodas === 1 ? "EUR" :
+              d.valiutos_kodas === 2 ? "USD" :
+              d.valiutos_kodas === 3 ? "PLN" :
+              d.valiutos_kodas === 4 ? "GBP" :
+              d.valiutos_kodas === 5 ? "JPY" : "UNKNOWN",
+            date: d.sukurimo_data,
+            paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+            categoryId: d.kategorija ? String(d.kategorija) : null,
+            splitType: "Lygiai",
+          }))
+          setTransactions(mappedTransactions)
+        }
+      } catch (error) {
+        console.error("Failed to load data:", error)
+        setGroup(null)
+      } finally {
+        setLoading(false)
       }
-
-      const fullGroupData = await groupApi.getGroup(groupId)
-      setGroup(fullGroupData)
-      setMembers(fullGroupData.members || [])
-      setTransactions(mappedTransactions)
-    } catch (error) {
-      console.error("Failed to load data:", error)
-      setGroup(null)
-    } finally {
-      setLoading(false)
     }
-  }
 
-  if (groupId) {
-    void fetchData()
-  }
-}, [groupId, router, user, isLoading])
+    if (groupId) {
+      void fetchData()
+    }
+  }, [groupId, router, user, isLoading])
 
   const handleAddMember = async (name: string): Promise<boolean> => {
     if (!user) {
@@ -245,6 +220,11 @@ export default function GroupPage() {
   }
 
   const handleSettleUp = async (memberId: number, amount: number) => {
+    if (!user) {
+      toast.error("Neprisijungęs vartotojas")
+      return
+    }
+
     await groupApi.settleUp(groupId, memberId)
 
     try {
@@ -259,6 +239,10 @@ export default function GroupPage() {
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
+    if (!user) {
+      toast.error("Prisijunkite norėdami redaguoti")
+      return
+    }
     setEditDialog({ open: true, transaction })
   }
 
@@ -278,12 +262,10 @@ export default function GroupPage() {
         amount: Number(d.suma),
         currency:
           d.valiutos_kodas === 1 ? "EUR" :
-            d.valiutos_kodas === 2 ? "USD" : 
-            d.valiutos_kodas === 3 ? "PLN" :
-            d.valiutos_kodas === 4 ? "GBP" :
-            d.valiutos_kodas === 5 ? "JPY" :
-            "UNKNOWN",
-
+          d.valiutos_kodas === 2 ? "USD" : 
+          d.valiutos_kodas === 3 ? "PLN" :
+          d.valiutos_kodas === 4 ? "GBP" :
+          d.valiutos_kodas === 5 ? "JPY" : "UNKNOWN",
         date: d.sukurimo_data,
         paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
         categoryId: d.kategorija ? String(d.kategorija) : null,
@@ -303,11 +285,8 @@ export default function GroupPage() {
 
     try {
       await groupApi.deleteDebt(transactionId, Number(user.id))
-
-      // Pašaliname iš local state
       setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
 
-      // Refresh grupės duomenis
       const groupData = await groupApi.getGroup(groupId)
       if (groupData) {
         setGroup(groupData)
@@ -315,45 +294,42 @@ export default function GroupPage() {
       }
     } catch (error: any) {
       console.error("Failed to delete transaction:", error)
-      throw error // Throw error kad TransactionsList gautų ir parodytų toast
+      throw error
     }
   }
 
   const refreshGroupData = async () => {
-  try {
-    if (!groupId || Number.isNaN(groupId)) return
+    try {
+      if (!groupId || Number.isNaN(groupId)) return
 
-    // Refresh group and members
-    const groupData = await groupApi.getGroup(groupId)
-    if (groupData) {
-      setGroup(groupData)
-      setMembers(groupData.members || [])
+      const groupData = await groupApi.getGroup(groupId)
+      if (groupData) {
+        setGroup(groupData)
+        setMembers(groupData.members || [])
+      }
+
+      const debts = await groupApi.getDebtsByGroup(groupId)
+      const mappedTransactions = debts.map((d: any) => ({
+        id: d.id_skola,
+        title: d.pavadinimas,
+        description: d.aprasymas || "",
+        amount: Number(d.suma),
+        currency:
+          d.valiutos_kodas === 1 ? "EUR" :
+          d.valiutos_kodas === 2 ? "USD" :
+          d.valiutos_kodas === 3 ? "PLN" :
+          d.valiutos_kodas === 4 ? "GBP" :
+          d.valiutos_kodas === 5 ? "JPY" : "UNKNOWN",
+        date: d.sukurimo_data,
+        paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
+        categoryId: d.kategorija ? String(d.kategorija) : null,
+        splitType: "Lygiai"
+      }))
+      setTransactions(mappedTransactions)
+    } catch (error) {
+      console.error("Failed to refresh group data:", error)
     }
-
-    // Refresh transactions
-    const debts = await groupApi.getDebtsByGroup(groupId)
-    const mappedTransactions = debts.map((d: any) => ({
-      id: d.id_skola,
-      title: d.pavadinimas,
-      description: d.aprasymas || "",
-      amount: Number(d.suma),
-      currency:
-  d.valiutos_kodas === 1 ? "EUR" :
-  d.valiutos_kodas === 2 ? "USD" :
-  d.valiutos_kodas === 3 ? "PLN" :
-  d.valiutos_kodas === 4 ? "GBP" :
-  d.valiutos_kodas === 5 ? "JPY" :
-  "UNKNOWN",
-      date: d.sukurimo_data,
-      paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
-      categoryId: d.kategorija ? String(d.kategorija) : null,
-      splitType: "Lygiai"
-    }))
-    setTransactions(mappedTransactions)
-  } catch (error) {
-    console.error("Failed to refresh group data:", error)
   }
-}
 
   if (loading) {
     return (
@@ -385,6 +361,26 @@ export default function GroupPage() {
 
   return (
     <div className="container max-w-4xl py-10">
+      {/* NAUJAS: Viešo režimo indikatorius */}
+      {isPublicView && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+          <Lock className="h-5 w-5 text-blue-600" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-900">
+              Peržiūrite grupę kaip svečias
+            </p>
+            <p className="text-xs text-blue-700">
+              Prisijunkite norėdami pridėti išlaidas ar valdyti grupę
+            </p>
+          </div>
+          <Link href="/login">
+            <Button size="sm" variant="default">
+              Prisijungti
+            </Button>
+          </Link>
+        </div>
+      )}
+
       <div className="mb-8">
         <Link href="/" className="text-muted-foreground hover:text-foreground inline-flex items-center mb-4">
           <ArrowLeftCircle className="mr-2 h-4 w-4" />
@@ -394,39 +390,43 @@ export default function GroupPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">{group.pavadinimas}</h1>
           <div className="flex items-center gap-2">
-            <Link href={`/groups/${groupId}/reports`}>
-              <Button variant="outline" size="sm">
-                <FileText className="h-4 w-4 mr-2" />
-                Ataskaitos
-              </Button>
-            </Link>
-            {userRole === "admin" && (
-              <Link href={`/groups/${groupId}/history`}>
-                <Button variant="outline" size="sm">
-                  <History className="h-4 w-4 mr-2" />
-                  Istorija
+            {!isPublicView && (
+              <>
+                <Link href={`/groups/${groupId}/reports`}>
+                  <Button variant="outline" size="sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Ataskaitos
+                  </Button>
+                </Link>
+                {userRole === "admin" && (
+                  <Link href={`/groups/${groupId}/history`}>
+                    <Button variant="outline" size="sm">
+                      <History className="h-4 w-4 mr-2" />
+                      Istorija
+                    </Button>
+                  </Link>
+                )}
+                <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Nustatymai
                 </Button>
-              </Link>
-            )}
-            <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
-              <Settings className="h-4 w-4 mr-2" />
-              Nustatymai
-            </Button>
-            {canAddExpense ? (
-              <Link href={`/groups/${groupId}/transactions/new`}>
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Pridėti išlaidą
-                </Button>
-              </Link>
-            ) : (
-              <Button
-                disabled
-                title={userRole === "guest" ? "Svečiai negali pridėti išlaidų" : "Pridėkite bent vieną narį"}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Pridėti išlaidą
-              </Button>
+                {canAddExpense ? (
+                  <Link href={`/groups/${groupId}/transactions/new`}>
+                    <Button>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Pridėti išlaidą
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    disabled
+                    title={userRole === "guest" ? "Svečiai negali pridėti išlaidų" : "Pridėkite bent vieną narį"}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Pridėti išlaidą
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -435,38 +435,44 @@ export default function GroupPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Apžvalga</TabsTrigger>
-          <TabsTrigger value="chat">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Pokalbiai
-          </TabsTrigger>
+          {!isPublicView && (
+            <TabsTrigger value="chat">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Pokalbiai
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Nariai</CardTitle>
-                {userRole !== "guest" && (
-                  <Button variant="outline" size="sm" onClick={() => setIsAddMemberOpen(true)}>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Pridėti narį
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <MembersList 
-              members={members} 
-              onSettleUp={handleSettleUp} 
-              onRemoveMember={handleRemoveMember} 
-              groupId={groupId}
-              onBalanceUpdate={refreshGroupData}
-              />
-            </CardContent>
-          </Card>
+          {/* Nariai - rodome tik viešoje peržiūroje be balansų */}
+          {!isPublicView && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Nariai</CardTitle>
+                  {userRole !== "guest" && (
+                    <Button variant="outline" size="sm" onClick={() => setIsAddMemberOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Pridėti narį
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MembersList 
+                  members={members} 
+                  onSettleUp={handleSettleUp} 
+                  onRemoveMember={handleRemoveMember} 
+                  groupId={groupId}
+                  onBalanceUpdate={refreshGroupData}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-          <PaymentHistory groupId={groupId} />
+          {!isPublicView && <PaymentHistory groupId={groupId} />}
 
+          {/* Išlaidos - rodoma VISIEMS (ir viešai) */}
           <Card>
             <CardHeader>
               <CardTitle>Išlaidos</CardTitle>
@@ -477,54 +483,60 @@ export default function GroupPage() {
                 members={members}
                 categories={categories}
                 userRole={userRole}
+                groupId={groupId}
                 currentUserId={user?.id ? Number(user.id) : undefined}
-                onEdit={handleEditTransaction}
-                onDelete={handleDeleteTransaction}
-                onSave={refreshGroupData} // Pridėkite šią eilutę
+                onEdit={isPublicView ? undefined : handleEditTransaction}
+                onDelete={isPublicView ? undefined : handleDeleteTransaction}
+                onSave={refreshGroupData}
+                isPublicView={isPublicView}
               />
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="chat">
-          <Card>
-            <CardHeader>
-              <CardTitle>Grupės pokalbiai</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <GroupChat groupId={groupId.toString()} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {!isPublicView && (
+          <TabsContent value="chat">
+            <Card>
+              <CardHeader>
+                <CardTitle>Grupės pokalbiai</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GroupChat groupId={groupId.toString()} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
-      <AddMemberDialog
-        open={isAddMemberOpen}
-        onOpenChange={setIsAddMemberOpen}
-        onAddMember={handleAddMember}
-        existingMembers={members}
-        groupId={groupId.toString()}
-      />
+      {!isPublicView && (
+        <>
+          <AddMemberDialog
+            open={isAddMemberOpen}
+            onOpenChange={setIsAddMemberOpen}
+            onAddMember={handleAddMember}
+            existingMembers={members}
+            groupId={groupId.toString()}
+          />
 
-      <GroupSettingsDialog
-        open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        groupId={groupId.toString()}
-        groupTitle={group.title}
-        members={groupMembers}
-        currentUserRole={userRole}
-      />
+          <GroupSettingsDialog
+            open={isSettingsOpen}
+            onOpenChange={setIsSettingsOpen}
+            groupId={groupId.toString()}
+            groupTitle={group.title}
+            members={groupMembers}
+            currentUserRole={userRole}
+          />
 
-      <EditTransactionDialog
-        open={editDialog.open}
-        onOpenChange={(open) => setEditDialog({ open, transaction: null })}
-        transaction={editDialog.transaction}
-        categories={categories}
-        groupId={groupId}
-        onSave={handleSaveEdit}
-        groupId={groupId}
-      />
-
+          <EditTransactionDialog
+            open={editDialog.open}
+            onOpenChange={(open) => setEditDialog({ open, transaction: null })}
+            transaction={editDialog.transaction}
+            categories={categories}
+            groupId={groupId}
+            onSave={handleSaveEdit}
+          />
+        </>
+      )}
     </div>
   )
 }
