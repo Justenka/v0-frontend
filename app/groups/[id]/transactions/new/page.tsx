@@ -37,7 +37,7 @@ export default function NaujaIslaidaPuslapis() {
   const [members, setMembers] = useState<Member[]>([])
   const [currency, setCurrency] = useState("EUR")
   const [enableLateFee, setEnableLateFee] = useState(false)
-  const [lateFeeAmount, setLateFeeAmount] = useState("")
+  const [lateFeePercentage, setLateFeePercentage] = useState("") // Changed from lateFeeAmount
   const [lateFeeDays, setLateFeeDays] = useState("7")
 
   const [categoryId, setCategoryId] = useState<string>("")
@@ -177,39 +177,69 @@ export default function NaujaIslaidaPuslapis() {
         }))
       }
 
-      await groupApi.createDebt({
-        groupId,
-        title: title.trim(), // PRIDĖTA .trim()
-        description: "",
-        amount: Number.parseFloat(amount),
-        currencyCode: currency,
-        paidByUserId: Number(paidByMember.id),
-        categoryId: categoryId || undefined,
-        splitType: splitType as "equal" | "percentage" | "dynamic",
-        splits,
-        lateFeeAmount: enableLateFee && lateFeeAmount ? Number.parseFloat(lateFeeAmount) : undefined,
-        lateFeeAfterDays: enableLateFee ? Number(lateFeeDays) : undefined,
-      },
-      Number(user.id),
-      )
+      // ✅ FIX: Properly prepare the request payload
+    const payload: any = {
+      groupId,
+      title: title.trim(),
+      description: "", // Empty description - backend will create metadata
+      amount: Number.parseFloat(amount),
+      currencyCode: currency,
+      paidByUserId: Number(paidByMember.id),
+      categoryId: categoryId || undefined,
+      splitType: splitType as "equal" | "percentage" | "dynamic",
+      splits,
+    };
 
-      toast.success("Išlaida sėkmingai pridėta!")
-      router.push(`/groups/${groupId}`)
-    } catch (error: any) {
-      console.error("Klaida kuriant išlaidą:", error)
+    // ✅ CRITICAL FIX: Only add late fee fields if they're enabled and valid
+    if (enableLateFee) {
+      const feePercentage = lateFeePercentage?.trim();
+      const feeDays = lateFeeDays?.trim();
+      
+      console.log('🔍 Late fee debug:', {
+        enableLateFee,
+        lateFeePercentage,
+        feePercentage,
+        feeDays
+      });
 
-      // Patikriname ar tai duplikato klaida
-      if (error.message.includes("jau egzistuoja")) {
-        setTitleError(error.message)
-        toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
-        setCurrentStep(0) // Grįžtame į pirmą žingsnį
-      } else {
-        toast.error(error.message || "Nepavyko pridėti išlaidos")
+      if (feePercentage && feePercentage !== '' && feePercentage !== '0') {
+        const parsedPercentage = Number.parseFloat(feePercentage);
+        
+        if (!isNaN(parsedPercentage) && parsedPercentage > 0) {
+          payload.lateFeePercentage = parsedPercentage;
+          payload.lateFeeAfterDays = feeDays ? Number(feeDays) : 7;
+          
+          console.log('✅ Adding late fee to payload:', {
+            lateFeePercentage: payload.lateFeePercentage,
+            lateFeeAfterDays: payload.lateFeeAfterDays
+          });
+        } else {
+          console.warn('⚠️ Invalid late fee percentage:', feePercentage);
+        }
       }
-    } finally {
-      setIsSubmitting(false)
     }
+
+    // Log the complete payload before sending
+    console.log('📤 Final payload:', JSON.stringify(payload, null, 2));
+
+    await groupApi.createDebt(payload, Number(user.id))
+
+    toast.success("Išlaida sėkmingai pridėta!")
+    router.push(`/groups/${groupId}`)
+  } catch (error: any) {
+    console.error("Klaida kuriant išlaidą:", error)
+
+    if (error.message.includes("jau egzistuoja")) {
+      setTitleError(error.message)
+      toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
+      setCurrentStep(0)
+    } else {
+      toast.error(error.message || "Nepavyko pridėti išlaidos")
+    }
+  } finally {
+    setIsSubmitting(false)
   }
+}
 
   const handlePercentageChange = (memberId: number, value: string) => {
     setPercentages({ ...percentages, [memberId]: value })
@@ -345,16 +375,23 @@ export default function NaujaIslaidaPuslapis() {
                   {enableLateFee && (
                     <div className="grid grid-cols-2 gap-4 pl-6">
                       <div className="space-y-2">
-                        <Label htmlFor="late-fee-amount">Delspinigių suma</Label>
-                        <Input
-                          id="late-fee-amount"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={lateFeeAmount}
-                          onChange={(e) => setLateFeeAmount(e.target.value)}
-                        />
+                        <Label htmlFor="late-fee-percentage">Delspinigių procentas (per dieną)</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="late-fee-percentage"
+                            type="number"
+                            min="0.01"
+                            max="100"
+                            step="0.01"
+                            placeholder="0.5"
+                            value={lateFeePercentage}
+                            onChange={(e) => setLateFeePercentage(e.target.value)}
+                          />
+                          <span className="text-sm text-gray-600">%</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Pavyzdžiui: 0.5% = 0.5% nuo likusios sumos per dieną
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="late-fee-days">Po kiek dienų</Label>
@@ -362,14 +399,31 @@ export default function NaujaIslaidaPuslapis() {
                           id="late-fee-days"
                           type="number"
                           min="1"
+                          max="365"
                           placeholder="7"
                           value={lateFeeDays}
-                          onChange={(e) => setLateFeeDays(e.target.value)}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val >= 1 || e.target.value === '') {
+                              setLateFeeDays(e.target.value);
+                            }
+                          }}
                         />
+                        <p className="text-xs text-gray-500">
+                          Mažiausiai 1 diena
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-600 col-span-2">
-                        Delspinigiai bus pridėti automatiškai po {lateFeeDays} dienų
-                      </p>
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-600">
+                          Delspinigiai bus skaičiuojami kasdien automatiškai po {lateFeeDays || '0'} dienų
+                          {lateFeePercentage && ` (${lateFeePercentage}% per dieną nuo likusios sumos)`}
+                        </p>
+                        {parseInt(lateFeeDays) < 1 && lateFeeDays !== '' && (
+                          <p className="text-xs text-red-500 mt-1">
+                            Laukimo laikas turi būti bent 1 diena
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -532,8 +586,8 @@ export default function NaujaIslaidaPuslapis() {
                         {splitType === "equal"
                           ? "Lygiomis dalimis"
                           : splitType === "percentage"
-                          ? "Procentais"
-                          : "Pagal sumą"}
+                            ? "Procentais"
+                            : "Pagal sumą"}
                       </p>
                     </div>
                     <div>
@@ -542,11 +596,13 @@ export default function NaujaIslaidaPuslapis() {
                     </div>
                   </div>
 
-                  {enableLateFee && lateFeeAmount && (
+                  {enableLateFee && lateFeePercentage && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                       <p className="text-sm font-medium text-yellow-900">
-                        Delspinigiai: {formatCurrency(Number.parseFloat(lateFeeAmount), currency)} po {lateFeeDays}{" "}
-                        dienų
+                        Delspinigiai: {lateFeePercentage}% per dieną po {lateFeeDays} dienų
+                      </p>
+                      <p className="text-xs text-yellow-800 mt-1">
+                        Bus skaičiuojami automatiškai kasdien nuo likusios sumos
                       </p>
                     </div>
                   )}
@@ -595,7 +651,8 @@ export default function NaujaIslaidaPuslapis() {
                   isLoading ||
                   !user?.name ||
                   !isPercentageValid() ||
-                  !isDynamicValid()
+                  !isDynamicValid() ||
+                  (enableLateFee && (!lateFeePercentage || parseFloat(lateFeePercentage) <= 0 || parseInt(lateFeeDays) < 1))
                 }
               >
                 {isSubmitting ? "Pridedama..." : "Pridėti išlaidą"}

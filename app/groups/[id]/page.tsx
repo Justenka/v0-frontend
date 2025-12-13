@@ -510,6 +510,7 @@ export default function GroupPage() {
         members={members}
         categories={categories}
         onSave={handleSaveEdit}
+        groupId={groupId}
       />
 
     </div>
