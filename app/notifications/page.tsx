@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { lt } from "date-fns/locale"
+import { groupApi } from "@/services/group-api"
 
 export type NotificationType =
   | "group_invite"
@@ -181,6 +182,7 @@ export default function NotificationsPage() {
 
   const handleNotificationClick = (notification: Notification) => {
     void markAsRead(notification.id)
+    if (notification.type === "group_invite") return
     if (notification.actionUrl) {
       router.push(notification.actionUrl)
     }
@@ -292,6 +294,51 @@ export default function NotificationsPage() {
                           </Button>
                         </div>
                       </div>
+
+                              {notification.type === "group_invite" && (
+    <div
+      className="flex gap-2 mt-3"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Button
+        size="sm"
+        onClick={async () => {
+          if (!user) return
+          const inviteId = Number(notification.metadata?.inviteId)
+          if (!inviteId) return
+
+          await groupApi.acceptGroupInvite(inviteId, Number(user.id))
+          await markAsRead(notification.id)
+
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notification.id)
+          )
+        }}
+      >
+        Priimti
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          if (!user) return
+          const inviteId = Number(notification.metadata?.inviteId)
+          if (!inviteId) return
+
+          await groupApi.declineGroupInvite(inviteId, Number(user.id))
+          await markAsRead(notification.id)
+
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notification.id)
+          )
+        }}
+      >
+        Atmesti
+      </Button>
+    </div>
+  )}
+                      
                       <p className="text-xs text-gray-500 mt-2">
                         {formatDistanceToNow(notification.timestamp, {
                           addSuffix: true,

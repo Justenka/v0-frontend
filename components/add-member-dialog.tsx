@@ -31,6 +31,17 @@ interface AddMemberDialogProps {
   groupId?: string
 }
 
+type Friend = {
+  id_vartotojas: number
+  vardas: string
+  pavarde?: string | null
+  el_pastas: string
+  avatar_url?: string | null
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
+
+
 export default function AddMemberDialog({
   open,
   onOpenChange,
@@ -47,9 +58,12 @@ export default function AddMemberDialog({
   const [linkCopied, setLinkCopied] = useState(false)
   const [publicLinkCopied, setPublicLinkCopied] = useState(false)
   const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false)
+  const [friendsError, setFriendsError] = useState<string | null>(null)
 
   const currentUser = mockUsers.find((u) => u.id === user?.id)
-  const friends = mockUsers.filter((u) => currentUser?.friends.includes(u.id))
+  //const friends = mockUsers.filter((u) => currentUser?.friends.includes(u.id))
 
   // Viešas peržiūros linkas
   const publicViewLink = groupId 
@@ -68,44 +82,135 @@ export default function AddMemberDialog({
     }
   }, [open])
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    let memberName = name.trim()
+  useEffect(() => {
+  const loadFriends = async () => {
+    if (!open) return
+    if (!user?.id) return
 
-    if (selectedFriend) {
-      const friend = friends.find((f) => f.id === selectedFriend)
-      if (friend) memberName = friend.name
+    setIsLoadingFriends(true)
+    setFriendsError(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/friends?userId=${user.id}`)
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) throw new Error(data?.message || "Nepavyko gauti draugų")
+      setFriends(data?.friends ?? [])
+    } catch (e: any) {
+      setFriends([])
+      setFriendsError(e?.message || "Nepavyko gauti draugų")
+    } finally {
+      setIsLoadingFriends(false)
     }
+  }
 
-    if (!memberName) return
-    const normalizedName = memberName.toLowerCase()
-    const isDuplicate = existingMembers.some((m) => m.name.toLowerCase() === normalizedName)
+  loadFriends()
+}, [open, user?.id])
 
-    if (isDuplicate) {
-      setError(`Narys "${memberName}" jau yra šioje grupėje.`)
+
+  /*const handleSubmit = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault()
+
+  const memberName = name.trim()
+  if (!memberName) return
+
+  const normalizedName = memberName.toLowerCase()
+  const isDuplicate = existingMembers.some((m) => m.name.toLowerCase() === normalizedName)
+
+  if (isDuplicate) {
+    setError(`Narys "${memberName}" jau yra šioje grupėje.`)
+    return
+  }
+
+  setIsSubmitting(true)
+  setError(null)
+  try {
+    const success = await onAddMember(memberName)
+    if (success) {
+      toast.success(`Narys „${memberName}“ pridėtas`)
+      setName("")
+      setEmail("")
+      onOpenChange(false)
+    } else {
+      setError("Nepavyko pridėti nario. Bandykite dar kartą.")
+    }
+  } catch (err) {
+    console.error("Error adding member:", err)
+    setError("Įvyko klaida. Bandykite dar kartą.")
+  } finally {
+    setIsSubmitting(false)
+  }
+}*/
+
+const handleSubmit = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault()
+
+  const memberEmail = email.trim()
+  const memberName = name.trim()
+  if (!memberEmail) return
+
+  const normalizedName = memberEmail.toLowerCase()
+  const isDuplicate = existingMembers.some((m) => m.email.toLowerCase() === normalizedName)
+
+  if (isDuplicate) {
+    setError(`Narys "${memberName}" jau yra šioje grupėje.`)
+    return
+  }
+
+  setIsSubmitting(true)
+  setError(null)
+  try {
+    const success = await onAddMember(memberEmail)
+    if (success) {
+      toast.success(`Narys „${memberName}“ pridėtas`)
+      setName("")
+      setEmail("")
+      onOpenChange(false)
+    } else {
+      setError("Nepavyko pridėti nario. Bandykite dar kartą.")
+    }
+  } catch (err) {
+    console.error("Error adding member:", err)
+    setError("Įvyko klaida. Bandykite dar kartą.")
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+
+    const handleSubmitFriend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+
+      // FRIEND TAB: invite only (do NOT add immediately)
+  if (selectedFriend) {
+    if (!user?.id) {
+      setError("Turite būti prisijungęs")
+      return
+    }
+    if (!groupId) {
+      setError("Nerastas grupės ID")
       return
     }
 
     setIsSubmitting(true)
     setError(null)
     try {
-      const success = await onAddMember(memberName)
-      if (success) {
-        toast.success(`Narys „${memberName}" pridėtas`)
-        setName("")
-        setEmail("")
-        setSelectedFriend(null)
-        onOpenChange(false)
-      } else {
-        setError("Nepavyko pridėti nario. Bandykite dar kartą.")
-      }
-    } catch (err) {
-      console.error("Error adding member:", err)
-      setError("Įvyko klaida. Bandykite dar kartą.")
+      await groupApi.inviteFriendToGroup(
+        Number(groupId),
+        Number(selectedFriend),
+        Number(user.id),
+      )
+
+      toast.success("Kvietimas išsiųstas!")
+      setSelectedFriend(null)
+      onOpenChange(false)
+    } catch (err: any) {
+      setError(err?.message || "Nepavyko išsiųsti kvietimo")
     } finally {
       setIsSubmitting(false)
     }
+    return
   }
+    }
 
   const handleGenerateInviteLink = async () => {
     if (!user?.id) {
@@ -182,13 +287,14 @@ export default function AddMemberDialog({
         <Tabs defaultValue="friends" className="w-full flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="friends">Iš draugų</TabsTrigger>
-            <TabsTrigger value="manual">Vardas</TabsTrigger>
-            <TabsTrigger value="link">Kvietimas</TabsTrigger>
+            <TabsTrigger value="manual">El. paštas</TabsTrigger>
+            <TabsTrigger value="link">Kvietimo nuoroda</TabsTrigger>
             <TabsTrigger value="public">Vieša nuoroda</TabsTrigger>
+            
           </TabsList>
 
           {/* --- Draugų sąrašas --- */}
-          <TabsContent value="friends" className="space-y-4 flex-1 overflow-y-auto mt-4">
+          {/*<TabsContent value="friends" className="space-y-4 flex-1 overflow-y-auto mt-4">
             {friends.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 Neturite draugų sąraše. Pridėkite draugų, kad galėtumėte juos kviesti į grupes.
@@ -224,13 +330,71 @@ export default function AddMemberDialog({
                 {isSubmitting ? "Pridedama..." : "Pridėti draugą"}
               </Button>
             )}
+          </TabsContent>*/}
+
+          <TabsContent value="friends" className="space-y-4 flex-1 overflow-y-auto mt-4">
+            {isLoadingFriends ? (
+              <p className="text-sm text-muted-foreground">Kraunami draugai...</p>
+            ) : friendsError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{friendsError}</AlertDescription>
+              </Alert>
+            ) : friends.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Draugų sąrašas tuščias arba nepavyko jo užkrauti.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {friends.map((friend) => {
+                  const fullName = `${friend.vardas} ${friend.pavarde || ""}`.trim()
+
+                  return (
+                    <button
+                      key={friend.id_vartotojas}
+                      type="button"
+                      onClick={() =>
+                        setSelectedFriend(
+                          String(friend.id_vartotojas) === selectedFriend ? null : String(friend.id_vartotojas),
+                        )
+                      }
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        selectedFriend === String(friend.id_vartotojas)
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback>{fullName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 text-left">
+                        <p className="font-medium">{fullName}</p>
+                        <p className="text-sm text-muted-foreground">{friend.el_pastas}</p>
+                      </div>
+
+                      {selectedFriend === String(friend.id_vartotojas) && (
+                        <UserPlus className="h-5 w-5 text-primary" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {selectedFriend && (
+              <Button onClick={handleSubmitFriend} disabled={isSubmitting} className="w-full">
+                {isSubmitting ? "Siunčiamas kvietimas..." : "Pakviesti draugą"}
+              </Button>
+            )}
           </TabsContent>
+
 
           {/* --- Rankinis pridėjimas --- */}
           <TabsContent value="manual" className="flex-1 overflow-y-auto mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Vardas</Label>
+              {/*<div className="space-y-2">
+                <Label htmlFor="name">Vardas (nebūtina)</Label>
                 <Input
                   id="name"
                   value={name}
@@ -239,23 +403,24 @@ export default function AddMemberDialog({
                     setError(null)
                   }}
                   placeholder="Įveskite vardą"
-                  required
+                  //required
                 />
-              </div>
+              </div>*/}
 
               <div className="space-y-2">
-                <Label htmlFor="email">El. paštas (nebūtina)</Label>
+                <Label htmlFor="email">El. paštas</Label>
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Įveskite el. pašto adresą"
+                  required
                 />
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                <Button type="submit" disabled={isSubmitting || !email.trim()}>
                   {isSubmitting ? "Pridedama..." : "Pridėti narį"}
                 </Button>
               </DialogFooter>
