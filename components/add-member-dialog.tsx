@@ -279,7 +279,7 @@ const handleSubmit = async (e?: React.FormEvent) => {
         <Tabs defaultValue="friends" className="w-full flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="friends">Iš draugų</TabsTrigger>
-            <TabsTrigger value="manual">Vardas/El. paštas</TabsTrigger>
+            <TabsTrigger value="manual">El. paštas</TabsTrigger>
             <TabsTrigger value="link">Kvietimo nuoroda</TabsTrigger>
           </TabsList>
 
@@ -383,7 +383,7 @@ const handleSubmit = async (e?: React.FormEvent) => {
           {/* --- Rankinis pridėjimas --- */}
           <TabsContent value="manual" className="flex-1 overflow-y-auto mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
+              {/*<div className="space-y-2">
                 <Label htmlFor="name">Vardas (nebūtina)</Label>
                 <Input
                   id="name"
@@ -395,7 +395,7 @@ const handleSubmit = async (e?: React.FormEvent) => {
                   placeholder="Įveskite vardą"
                   //required
                 />
-              </div>
+              </div>*/}
 
               <div className="space-y-2">
                 <Label htmlFor="email">El. paštas</Label>
