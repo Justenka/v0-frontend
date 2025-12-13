@@ -171,6 +171,41 @@ acceptInvite: async (groupId: number, token: string, actorId: number) => {
   return data as { ok: boolean; alreadyMember?: boolean }
 },
 
+inviteFriendToGroup: async (groupId: number, toUserId: number, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/invite-friend`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(actorId),
+    },
+    body: JSON.stringify({ toUserId }),
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.message || "Nepavyko išsiųsti kvietimo į grupę")
+  }
+
+  return data
+},
+
+acceptGroupInvite: async (inviteId: number, userId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/invites/${inviteId}/accept`, {
+    method: "POST",
+    headers: { "x-user-id": String(userId) },
+  })
+  if (!res.ok) throw new Error("Nepavyko priimti kvietimo")
+},
+
+declineGroupInvite: async (inviteId: number, userId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/invites/${inviteId}/decline`, {
+    method: "POST",
+    headers: { "x-user-id": String(userId) },
+  })
+  if (!res.ok) throw new Error("Nepavyko atmesti kvietimo")
+},
+
 
 
     // Remove a member from a group
