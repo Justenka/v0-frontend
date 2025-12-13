@@ -37,6 +37,8 @@ export async function fetchCurrenciesFromDB(): Promise<Currency[]> {
       { id: 1, code: "EUR", symbol: "€", name: "Euro", exchangeRate: 1 },
       { id: 2, code: "USD", symbol: "$", name: "US Dollar", exchangeRate: 1.09 },
       { id: 3, code: "PLN", symbol: "zł", name: "Polish Zloty", exchangeRate: 4.23 },
+      { id: 4, code: "GBP", symbol: "£", name: "British Pound", exchangeRate: 0.85 },
+      { id: 5, code: "JPY", symbol: "¥", name: "Japanese Yen", exchangeRate: 145.0 },
     ]
   }
 }

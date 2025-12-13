@@ -134,6 +134,44 @@ export const groupApi = {
   return data.id_grupe ? data : await groupApi.getGroup(groupId)
 },
 
+createInvite: async (groupId: number, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/invites`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(actorId),
+    },
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.message || "Nepavyko sukurti kvietimo")
+  }
+
+  return data as { token: string; expiresAt: string }
+},
+
+acceptInvite: async (groupId: number, token: string, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/join`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(actorId),
+    },
+    body: JSON.stringify({ token }),
+  })
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.message || "Nepavyko prisijungti prie grupės")
+  }
+
+  return data as { ok: boolean; alreadyMember?: boolean }
+},
+
+
 
     // Remove a member from a group
     /*removeMember: async (groupId: number, memberId: number) => {
@@ -310,39 +348,36 @@ export const groupApi = {
     },
 
     // Update debt (edit transaction)
-    async updateDebt(
-        debtId: number,
-        data: {
-            title: string;
-            description?: string;
-            amount: number;
-            currencyCode: string;
-            categoryId?: string;
-            paidById?: number; 
-            splits?: { userId: number; amount?: number; percentage?: number }[];
-            userId: number;
-        }
-    ) {
-        const res = await fetch(`${API_BASE}/api/debts/${debtId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        })
+async updateDebt(
+    debtId: number,
+    data: {
+        title: string;
+        categoryId?: string;
+        userId: number;
+    }
+) {
+    const res = await fetch(`${API_BASE}/api/debts/${debtId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.message || "Nepavyko atnaujinti skolos")
-        }
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || "Nepavyko atnaujinti skolos")
+    }
 
-        return res.json()
-    },
+    return res.json()
+},
 
     // Get balances for a user in a group
     async getUserBalances(groupId: number, userId: number): Promise<{
         userId: number;
         userName: string;
         amount: number;
+        amountEUR: number;
         currency: string;
+        kursasEurui: number;
         type: 'owes_me' | 'i_owe';
     }[]> {
         const res = await fetch(`${API_BASE}/api/groups/${groupId}/balances/${userId}`)

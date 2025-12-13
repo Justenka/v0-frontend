@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import type { Transaction } from "@/types/transaction"
-import type { Member } from "@/types/member"
 import { toast } from "sonner"
-import { getSupportedCurrencies, type Currency } from "@/lib/currency-api"
 import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -26,17 +24,15 @@ interface EditTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   transaction: Transaction | null
-  members: Member[]
   categories: Array<{ id: string; name: string }>
   onSave: () => void
-  groupId: number // Add this prop
+  groupId: number
 }
 
 export function EditTransactionDialog({
   open,
   onOpenChange,
   transaction,
-  members,
   categories,
   onSave,
   groupId,
@@ -44,35 +40,9 @@ export function EditTransactionDialog({
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState("")
-  const [amount, setAmount] = useState("")
-  const [paidByUserId, setPaidByUserId] = useState("")
-  const [splitType, setSplitType] = useState<"equal" | "percentage" | "custom">("equal")
-  const [currency, setCurrency] = useState("EUR")
   const [categoryId, setCategoryId] = useState("")
-  const [splits, setSplits] = useState<{ userId: number; amount: number; percentage: number }[]>([])
-  const [fullDebtData, setFullDebtData] = useState<any>(null)
-  const [supportedCurrencies, setSupportedCurrencies] = useState<Currency[]>([])
-  const [loadingCurrencies, setLoadingCurrencies] = useState(true)
   const [duplicateWarning, setDuplicateWarning] = useState(false)
   const [checkingDuplicate, setCheckingDuplicate] = useState(false)
-
-  // Load currencies
-  useEffect(() => {
-    const loadCurrencies = async () => {
-      try {
-        setLoadingCurrencies(true)
-        const currencies = await getSupportedCurrencies()
-        setSupportedCurrencies(currencies)
-      } catch (error) {
-        console.error("Error loading currencies:", error)
-        toast.error("Nepavyko įkelti valiutų")
-      } finally {
-        setLoadingCurrencies(false)
-      }
-    }
-
-    loadCurrencies()
-  }, [])
 
   useEffect(() => {
     if (transaction && open) {
@@ -101,7 +71,7 @@ export function EditTransactionDialog({
       } finally {
         setCheckingDuplicate(false)
       }
-    }, 500) // Wait 500ms after user stops typing
+    }, 500)
 
     return () => clearTimeout(timeoutId)
   }, [title, groupId, transaction])
@@ -111,48 +81,8 @@ export function EditTransactionDialog({
 
     try {
       const debtData = await groupApi.getDebt(transaction.id)
-      setFullDebtData(debtData)
-
       setTitle(debtData.title)
-      setAmount(debtData.amount.toString())
-      setCurrency(debtData.currency || "EUR")
       setCategoryId(debtData.categoryId ? String(debtData.categoryId) : "")
-
-      // Set the payer
-      if (debtData.paidByUserId) {
-        setPaidByUserId(String(debtData.paidByUserId))
-      } else if (debtData.splits && debtData.splits.length > 0) {
-        const payer = debtData.splits.find((s: any) => s.role === 2)
-        if (payer) {
-          setPaidByUserId(String(payer.userId))
-        }
-      }
-
-      // Set splits
-      if (debtData.splits && debtData.splits.length > 0) {
-        setSplits(debtData.splits.map((s: any) => ({
-          userId: s.userId,
-          amount: s.amount || 0,
-          percentage: s.percentage || 0,
-        })))
-
-        const totalAmount = debtData.amount
-        const equalShare = totalAmount / debtData.splits.length
-        const tolerance = 0.01
-        
-        const isEqual = debtData.splits.every((s: any) => 
-          Math.abs(s.amount - equalShare) < tolerance
-        )
-        
-        if (isEqual) {
-          setSplitType("equal")
-        } else {
-          const hasPercentages = debtData.splits.some((s: any) => 
-            s.percentage && s.percentage > 0
-          )
-          setSplitType(hasPercentages ? "percentage" : "custom")
-        }
-      }
     } catch (error) {
       console.error("Failed to load transaction details:", error)
       toast.error("Nepavyko įkelti išlaidos duomenų")
@@ -162,19 +92,8 @@ export function EditTransactionDialog({
   const handleSave = async () => {
     if (!transaction || !user) return
 
-    const updatedAmount = parseFloat(amount)
-    if (isNaN(updatedAmount) || updatedAmount <= 0) {
-      toast.error("Įveskite teisingą sumą")
-      return
-    }
-
     if (!title.trim()) {
       toast.error("Įveskite pavadinimą")
-      return
-    }
-
-    if (!paidByUserId) {
-      toast.error("Pasirinkite kas mokėjo")
       return
     }
 
@@ -186,36 +105,9 @@ export function EditTransactionDialog({
     setLoading(true)
 
     try {
-      let calculatedSplits: { userId: number; amount?: number; percentage?: number }[] = []
-
-      if (splitType === "equal") {
-        const perPerson = updatedAmount / members.length
-        calculatedSplits = members.map(m => ({
-          userId: m.id,
-          amount: perPerson,
-          percentage: (100 / members.length),
-        }))
-      } else if (splitType === "percentage") {
-        calculatedSplits = splits.map(s => ({
-          userId: s.userId,
-          percentage: s.percentage,
-          amount: (updatedAmount * s.percentage) / 100,
-        }))
-      } else {
-        calculatedSplits = splits.map(s => ({
-          userId: s.userId,
-          amount: s.amount,
-          percentage: (s.amount / updatedAmount) * 100,
-        }))
-      }
-
       await groupApi.updateDebt(transaction.id, {
         title: title.trim(),
-        amount: updatedAmount,
-        currencyCode: currency,
         categoryId,
-        paidById: Number(paidByUserId),
-        splits: calculatedSplits,
         userId: Number(user.id),
       })
 
@@ -234,7 +126,7 @@ export function EditTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Redaguoti išlaidą</DialogTitle>
           <DialogDescription>Atnaujinkite išlaidos informaciją</DialogDescription>
@@ -263,51 +155,6 @@ export function EditTransactionDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-amount">Suma</Label>
-              <Input
-                id="edit-amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-currency">Valiuta</Label>
-              <Select value={currency} onValueChange={setCurrency} disabled={loadingCurrencies}>
-                <SelectTrigger id="edit-currency" className="w-[100px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {supportedCurrencies.map((curr) => (
-                    <SelectItem key={curr.code} value={curr.code}>
-                      {curr.symbol} {curr.code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-paidBy">Kas mokėjo</Label>
-            <Select value={paidByUserId} onValueChange={setPaidByUserId}>
-              <SelectTrigger id="edit-paidBy">
-                <SelectValue placeholder="Pasirinkite" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((member) => (
-                  <SelectItem key={member.id} value={String(member.id)}>
-                    {member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="edit-category">Kategorija</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
@@ -331,7 +178,7 @@ export function EditTransactionDialog({
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={loading || !title || !amount || !paidByUserId || duplicateWarning}
+            disabled={loading || !title || duplicateWarning}
           >
             {loading ? "Saugoma..." : "Išsaugoti"}
           </Button>

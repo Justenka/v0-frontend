@@ -21,6 +21,7 @@ import { mockUsers } from "@/lib/mock-data"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
+import { groupApi } from "@/services/group-api"
 
 interface AddMemberDialogProps {
   open: boolean
@@ -35,7 +36,7 @@ export default function AddMemberDialog({
   onOpenChange,
   onAddMember,
   existingMembers,
-  groupId = "1", // fallback to dummy id
+  groupId, //= "1", // fallback to dummy id
 }: AddMemberDialogProps) {
   const { user } = useAuth()
   const [name, setName] = useState("")
@@ -98,13 +99,49 @@ export default function AddMemberDialog({
     }
   }
 
-  const handleGenerateInviteLink = () => {
+  /*const handleGenerateInviteLink = () => {
     const link = `${window.location.origin}/groups/${groupId}/join?token=${Math.random()
       .toString(36)
       .substring(7)}`
     setInviteLink(link)
     toast.success("Kvietimo nuoroda sugeneruota!")
+  }*/
+
+    const handleGenerateInviteLink = async () => {
+  if (!user?.id) {
+    toast.error("Turite būti prisijungęs, kad sukurtumėte kvietimą")
+    return
   }
+  if (!groupId) {
+  toast.error("Nerastas grupės ID")
+  return
+  }
+
+
+  try {
+    setIsSubmitting(true)
+    setError(null)
+
+    const numericGroupId = Number(groupId)
+    const { token } = await groupApi.createInvite(
+      numericGroupId,
+      Number(user.id)
+    )
+    
+
+    const link = `${window.location.origin}/groups/${numericGroupId}/join?token=${encodeURIComponent(
+      token
+    )}`
+
+    setInviteLink(link)
+    toast.success("Kvietimo nuoroda sugeneruota!")
+  } catch (e: any) {
+    toast.error(e?.message || "Nepavyko sugeneruoti kvietimo")
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+
 
   const handleCopyLink = async () => {
     try {
@@ -249,7 +286,7 @@ export default function AddMemberDialog({
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Ši nuoroda galioja 7 dienas ir gali būti panaudota iki 10 kartų.
+                    Ši nuoroda galioja 7 dienas ir gali būti panaudota 1 kartą.
                   </p>
                   <Button onClick={handleGenerateInviteLink} variant="outline" className="w-full bg-transparent">
                     Generuoti naują nuorodą
