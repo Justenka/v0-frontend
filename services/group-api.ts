@@ -18,6 +18,24 @@ import { UserRole } from "@/types/user";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
+const normalizeAvatarUrl = (avatar?: string | null) => {
+  if (!avatar) return null
+
+  let a = String(avatar).trim()
+  if (!a) return null
+
+  // pilnas URL
+  if (a.startsWith("http://") || a.startsWith("https://")) return a
+
+  // jei DB grąžina tik failo vardą
+  if (!a.startsWith("/")) {
+    a = `/uploads/avatars/${a}`
+  }
+
+  // jei jau /uploads/... ar bet koks "/..."
+  return `${API_BASE}${a}`
+}
+
 export const groupApi = {
 
       async convertCurrency(
@@ -40,6 +58,8 @@ export const groupApi = {
     return data.amount
   },
 
+  
+
   async getAllCurrencies(): Promise<Array<{ id_valiuta: number; name: string; santykis: number }>> {
     const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
     
@@ -55,14 +75,29 @@ export const groupApi = {
   
     // Get a specific group by ID – tikras backend'as
     getGroup: async (groupId: number) => {
-        const res = await fetch(`${API_BASE}/api/groups/${groupId}`)
+      const res = await fetch(`${API_BASE}/api/groups/${groupId}`, {
+        cache: "no-store",
+      })
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.message || "Nepavyko gauti grupės")
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Nepavyko gauti grupės")
+      }
+
+      
+      const members = (data.members ?? []).map((m: any) => {
+        const rawAvatar = m.avatarUrl ?? m.avatar_url ?? null
+        return {
+          ...m,
+          avatarUrl: normalizeAvatarUrl(rawAvatar),
         }
+      })
 
-        return res.json()
+      return {
+        ...data,
+        members,
+      }
     },
 
     // Create a new group
@@ -569,4 +604,6 @@ async updateDebt(
     return res.json();
   },
 
+
+  
 }

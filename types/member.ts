@@ -6,4 +6,5 @@ export interface Member {
   balance: number
   email: string
   role: UserRole
+  avatar_url?: string | null
 }

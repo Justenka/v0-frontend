@@ -23,12 +23,40 @@ import { toast } from "sonner"
 import type { UserRole } from "@/types/user"
 import { groupApi } from "@/services/group-api"
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+
+const normalizeAvatar = (avatar?: string | null) => {
+  if (!avatar) return ""
+  let a = String(avatar).trim()
+  if (!a) return ""
+
+  // pilnas URL
+  if (a.startsWith("http://") || a.startsWith("https://")) return a
+
+  // jei grąžina "uploads/avatars/.."
+  if (a.startsWith("uploads/")) a = `/${a}`
+
+  // jei grąžina "/uploads/..." arba "/something"
+  if (a.startsWith("/")) return `${API_BASE}${a}`
+
+  // jei grąžina tik failo pavadinimą
+  return `${API_BASE}/uploads/avatars/${a}`
+}
+
 interface GroupSettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   groupId: string
   groupTitle: string
-  members: Array<{ id: string; name: string; email: string; role: UserRole; balance?: number }>
+  members: Array<{
+    id: string
+    name: string
+    email: string
+    role: UserRole
+    balance?: number
+    avatarUrl?: string | null
+    avatar_url?: string | null
+  }>
   currentUserRole: UserRole
   currentUserId: number
   onRolesUpdated?: () => void
@@ -45,21 +73,20 @@ export function GroupSettingsDialog({
   onRolesUpdated,
 }: GroupSettingsDialogProps) {
   const router = useRouter()
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-
-  const canManageMembers = currentUserRole === "admin"
-  const [membersState, setMembersState] = useState(members)
 
   const [showLeaveDialog, setShowLeaveDialog] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
-  // remove member confirm
+  const canManageMembers = currentUserRole === "admin"
+  const [membersState, setMembersState] = useState(members)
+
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
 
-  // ✅ per-member remove errors (rodoma tame pačiame nario box'e)
   const [removeErrorByMemberId, setRemoveErrorByMemberId] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -88,71 +115,20 @@ export function GroupSettingsDialog({
     const myBalanceKnown = me?.balance !== undefined && me?.balance !== null
     const myBalance = Number(me?.balance ?? 0)
 
-    if (!myBalanceKnown) {
-      return { canLeave: false, reason: "Nepavyko nustatyti balanso. Atnaujinkite puslapį." }
-    }
-
-    if (Math.abs(myBalance) > 0.01) {
+    if (!myBalanceKnown) return { canLeave: false, reason: "Nepavyko nustatyti balanso. Atnaujinkite puslapį." }
+    if (Math.abs(myBalance) > 0.01)
       return { canLeave: false, reason: "Negalite palikti grupės, kol neatsiskaitėte (balansas turi būti 0)." }
-    }
 
     if (currentUserRole === "admin") {
       const adminCount = membersState.filter((m) => m.role === "admin").length
-      if (adminCount <= 1) {
+      if (adminCount <= 1)
         return { canLeave: false, reason: "Esate vienintelis administratorius. Pirma perduokite admin teises kitam nariui." }
-      }
     }
 
     return { canLeave: true, reason: "" }
   }
 
   const leaveStatus = canLeaveGroup()
-
-  const handleLeaveGroup = async () => {
-    setIsLeaving(true)
-    try {
-      await groupApi.leaveGroup(Number(groupId), currentUserId)
-      toast.success("Palikote grupę")
-      onOpenChange(false)
-      router.push("/")
-      router.refresh()
-    } catch (e: any) {
-      toast.error(e?.message || "Nepavyko palikti grupės")
-    } finally {
-      setIsLeaving(false)
-      setShowLeaveDialog(false)
-    }
-  }
-
-  const handleChangeRole = async (memberId: string, newRole: UserRole) => {
-    if (!canManageMembers) return
-
-    if (!currentUserId) {
-      toast.error("Turite būti prisijungęs")
-      return
-    }
-
-    try {
-      const res = await groupApi.updateMemberRole(Number(groupId), Number(memberId), newRole, currentUserId)
-
-      setMembersState((prev) => {
-        if (res?.transferred) {
-          return prev.map((m) => {
-            if (m.id === memberId) return { ...m, role: "admin" as UserRole }
-            if (m.id === String(currentUserId)) return { ...m, role: "member" as UserRole }
-            return m
-          })
-        }
-        return prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
-      })
-
-      toast.success("Nario rolė pakeista")
-    } catch (e: any) {
-      toast.error(e?.message || "Nepavyko pakeisti rolės")
-    }
-
-    if (onRolesUpdated) onRolesUpdated()
-  }
 
   const getRoleBadgeVariant = (role: UserRole) => {
     switch (role) {
@@ -176,12 +152,53 @@ export function GroupSettingsDialog({
     }
   }
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(" ")
-      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((n) => n[0]!.toUpperCase())
       .join("")
-      .toUpperCase()
+
+  const handleLeaveGroup = async () => {
+    setIsLeaving(true)
+    try {
+      await groupApi.leaveGroup(Number(groupId), currentUserId)
+      toast.success("Palikote grupę")
+      onOpenChange(false)
+      router.push("/")
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e?.message || "Nepavyko palikti grupės")
+    } finally {
+      setIsLeaving(false)
+      setShowLeaveDialog(false)
+    }
+  }
+
+  const handleChangeRole = async (memberId: string, newRole: UserRole) => {
+    if (!canManageMembers) return
+    if (!currentUserId) return toast.error("Turite būti prisijungęs")
+
+    try {
+      const res = await groupApi.updateMemberRole(Number(groupId), Number(memberId), newRole, currentUserId)
+
+      setMembersState((prev) => {
+        if (res?.transferred) {
+          return prev.map((m) => {
+            if (m.id === memberId) return { ...m, role: "admin" as UserRole }
+            if (m.id === String(currentUserId)) return { ...m, role: "member" as UserRole }
+            return m
+          })
+        }
+        return prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+      })
+
+      toast.success("Nario rolė pakeista")
+      onRolesUpdated?.()
+    } catch (e: any) {
+      toast.error(e?.message || "Nepavyko pakeisti rolės")
+    }
   }
 
   const handleDeleteGroup = async () => {
@@ -194,17 +211,15 @@ export function GroupSettingsDialog({
       router.refresh()
     } catch (error) {
       toast.error("Nepavyko ištrinti grupės")
-      console.error("[v0] Error deleting group:", error)
+      console.error("[GroupSettings] delete error:", error)
     } finally {
       setIsDeleting(false)
       setShowDeleteDialog(false)
     }
   }
 
-  // ✅ gražinam žmogui suprantamą pašalinimo klaidą
   const explainRemoveError = (raw: string) => {
     const msg = (raw || "").toLowerCase()
-
     if (msg.includes("atsiskait") || msg.includes("neapmok") || msg.includes("skol")) {
       return "Negalima pašalinti, nes šis narys dar nėra pilnai atsiskaitęs su grupės nariais."
     }
@@ -214,16 +229,12 @@ export function GroupSettingsDialog({
     if (msg.includes("savinink") || msg.includes("owner")) {
       return "Negalima pašalinti grupės savininko. Pirma perduokite administratoriaus teises/owner kitam nariui."
     }
-    if (msg.includes("tik administrator")) {
-      return "Tik administratoriai gali šalinti narius."
-    }
-
+    if (msg.includes("tik administrator")) return "Tik administratoriai gali šalinti narius."
     return raw || "Nepavyko pašalinti nario."
   }
 
-  // ✅ click ant "Pašalinti": nieko nerašom boxe, bet jei yra klaida – parodom tame boxe
   const handleRemoveClick = (member: { id: string; name: string; role: UserRole }) => {
-    // išvalom konkretaus nario seną klaidą
+    // išvalom seną klaidą tam nariui
     setRemoveErrorByMemberId((prev) => {
       const next = { ...prev }
       delete next[member.id]
@@ -235,7 +246,7 @@ export function GroupSettingsDialog({
       return
     }
 
-    // neleidžiam pašalinti savęs, jei esi vienintelis admin
+    // jei bandai šalinti save ir esi vienintelis admin
     const isSelfAdmin = member.id === String(currentUserId) && member.role === "admin"
     if (isSelfAdmin) {
       const adminCount = membersState.filter((m) => m.role === "admin").length
@@ -253,22 +264,16 @@ export function GroupSettingsDialog({
   }
 
   const handleRemoveMemberConfirmed = async () => {
-    if (!canManageMembers) return
-    if (!removeTarget) return
+    if (!canManageMembers || !removeTarget) return
 
     const memberIdNum = Number(removeTarget.id)
-    if (!memberIdNum) {
-      toast.error("Blogas nario ID")
-      return
-    }
+    if (!memberIdNum) return toast.error("Blogas nario ID")
 
     setIsRemoving(true)
     try {
       await groupApi.removeMember(Number(groupId), memberIdNum, currentUserId)
-
       setMembersState((prev) => prev.filter((m) => m.id !== removeTarget.id))
 
-      // išvalom jo klaidą, jei buvo
       setRemoveErrorByMemberId((prev) => {
         const next = { ...prev }
         delete next[removeTarget.id]
@@ -278,12 +283,11 @@ export function GroupSettingsDialog({
       toast.success("Narys pašalintas")
       setRemoveDialogOpen(false)
       setRemoveTarget(null)
-
-      if (onRolesUpdated) onRolesUpdated()
+      onRolesUpdated?.()
     } catch (e: any) {
       const pretty = explainRemoveError(e?.message || "")
       setRemoveErrorByMemberId((prev) => ({ ...prev, [removeTarget.id]: pretty }))
-      setRemoveDialogOpen(false) // uždarom confirm, o paaiškinimą rodom nario box'e
+      setRemoveDialogOpen(false)
     } finally {
       setIsRemoving(false)
     }
@@ -315,13 +319,19 @@ export function GroupSettingsDialog({
                   const isSelf = member.id === String(currentUserId)
                   const isSelfAdmin = isSelf && member.role === "admin"
 
+                  // ✅ čia svarbiausia vieta: imame avatarUrl / avatar_url ir normalizuojam
+                  const rawAvatar = member.avatarUrl ?? member.avatar_url ?? null
+                  const avatarSrc = normalizeAvatar(rawAvatar)
+
                   return (
                     <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src="/placeholder.svg" alt={member.name} />
+                          {/* Jei src tuščias – neduodam src, kad nebūtų broken request */}
+                          <AvatarImage key={avatarSrc} src={avatarSrc || undefined} alt={member.name} />
                           <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                         </Avatar>
+
                         <div>
                           <p className="font-medium">{member.name}</p>
                           <p className="text-sm text-gray-600">{member.email}</p>
@@ -352,11 +362,7 @@ export function GroupSettingsDialog({
                                 size="sm"
                                 onClick={() => handleRemoveClick({ id: member.id, name: member.name, role: member.role })}
                                 disabled={isSelfAdmin}
-                                title={
-                                  isSelfAdmin
-                                    ? "Pirmiausia perduokite admin teises kitam nariui"
-                                    : "Pašalinti narį"
-                                }
+                                title={isSelfAdmin ? "Pirmiausia perduokite admin teises kitam nariui" : "Pašalinti narį"}
                               >
                                 <UserMinus className="h-4 w-4 mr-2" />
                                 Pašalinti
@@ -367,7 +373,6 @@ export function GroupSettingsDialog({
                           )}
                         </div>
 
-                        {/* ✅ čia “tas pats boxas”: default tuščias, bet jei klaida – rodome */}
                         {!!removeErrorByMemberId[member.id] && (
                           <div className="max-w-[360px] rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                             {removeErrorByMemberId[member.id]}
@@ -395,19 +400,6 @@ export function GroupSettingsDialog({
                         <strong>Svečias:</strong> Gali tik peržiūrėti grupę
                       </li>
                     </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-slate-700 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-slate-900 mb-1">Administratoriaus teisių perdavimas</p>
-                    <p className="text-slate-700">
-                      Jei esate vienintelis administratorius, negalėsite palikti grupės ar pašalinti savęs, kol nepriskirsite
-                      „Administratorius“ rolės kitam nariui. Pasirinkite narį sąraše ir pakeiskite jo rolę į „Administratorius“.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -503,11 +495,7 @@ export function GroupSettingsDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Atšaukti</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteGroup}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleDeleteGroup} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
               {isDeleting ? "Trinamas..." : "Taip, ištrinti grupę"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -528,12 +516,8 @@ export function GroupSettingsDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLeaving}>Atšaukti</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleLeaveGroup}
-              disabled={isLeaving}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              {isLeaving ? "Paliekama..." : "Taip, palikti grupę"}
+            <AlertDialogAction onClick={handleLeaveGroup} disabled={isLeaving} className="bg-orange-600 hover:bg-orange-700">
+              {isLeaving ? "Paliekama..." : "Taip, palikti"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

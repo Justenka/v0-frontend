@@ -61,13 +61,12 @@ export default function GroupPage() {
     }
   }, [isLoading, user])
 
-  // ✅ SVARBU: perduodam ir balance (globalus grupės balansas)
 const groupMembers = members.map((member: any) => ({
+  ...member,
   id: String(member.id),
-  name: member.name,
-  email: member.email,
-  role: member.role,
   balance: typeof member.balance === "number" ? member.balance : Number(member.balance ?? 0),
+
+  avatar_url: member.avatar_url ?? member.avatarUrl ?? null,
 }))
 
   useEffect(() => {
