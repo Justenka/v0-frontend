@@ -17,6 +17,7 @@ import {
   UserPlus,
   CheckCheck,
   Trash2,
+  type LucideIcon,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { lt } from "date-fns/locale"
@@ -44,7 +45,7 @@ export interface Notification {
   metadata?: Record<string, any>
 }
 
-const notificationIcons = {
+const notificationIcons: Record<NotificationType, LucideIcon> = {
   group_invite: Users,
   friend_request: UserPlus,
   payment_received: DollarSign,
@@ -53,6 +54,16 @@ const notificationIcons = {
   group_message: MessageSquare,
   personal_message: MessageSquare,
   system: Bell,
+}
+
+const getNotificationIcon = (type: any): LucideIcon => {
+  const key = String(type ?? "").trim()
+  return (notificationIcons as any)[key] ?? Bell
+}
+
+const normalizeType = (type: any): NotificationType => {
+  const key = String(type ?? "").trim()
+  return (key in notificationIcons ? (key as NotificationType) : "system")
 }
 
 export default function NotificationsPage() {
@@ -82,7 +93,7 @@ export default function NotificationsPage() {
         const mapped: Notification[] = (data.notifications || []).map((n: any) => ({
           id: String(n.id),
           userId: String(n.userId),
-          type: n.type,
+          type: normalizeType(n.type),
           title: n.title,
           message: n.message,
           read: !!n.read,
@@ -114,9 +125,7 @@ export default function NotificationsPage() {
     if (!user) return
 
     // optimistinis atnaujinimas
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    )
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
 
     try {
       await fetch(`${API_BASE}/api/notifications/${id}/read`, {
@@ -126,7 +135,6 @@ export default function NotificationsPage() {
       })
     } catch (err) {
       console.error("Mark as read error:", err)
-      // jei nori – čia gali grąžinti state atgal
     }
   }
 
@@ -196,19 +204,13 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-3xl font-bold">Pranešimai</h1>
           <p className="text-gray-600 mt-1">
-            {unreadCount > 0
-              ? `${unreadCount} neperskaityti pranešimai`
-              : "Visi pranešimai perskaityti"}
+            {unreadCount > 0 ? `${unreadCount} neperskaityti pranešimai` : "Visi pranešimai perskaityti"}
           </p>
         </div>
 
         {notifications.length > 0 && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={deleteAllNotifications}
-              className="bg-transparent"
-            >
+            <Button variant="outline" onClick={deleteAllNotifications} className="bg-transparent">
               <Trash2 className="h-4 w-4 mr-2" />
               Ištrinti viską
             </Button>
@@ -232,7 +234,14 @@ export default function NotificationsPage() {
           </Card>
         ) : (
           notifications.map((notification) => {
-            const Icon = notificationIcons[notification.type]
+            const Icon = getNotificationIcon(notification.type)
+
+            // debug: jei ateina kažkoks neaprašytas type
+            const rawKey = String(notification.type ?? "").trim()
+            if (!(rawKey in notificationIcons)) {
+              console.log("[Notifications] Unknown type:", notification.type, notification)
+            }
+
             return (
               <Card
                 key={notification.id}
@@ -243,50 +252,37 @@ export default function NotificationsPage() {
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
-                    <div
-                      className={`p-2 rounded-full ${
-                        !notification.read ? "bg-blue-100" : "bg-gray-100"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-5 w-5 ${
-                          !notification.read ? "text-blue-600" : "text-gray-600"
-                        }`}
-                      />
+                    <div className={`p-2 rounded-full ${!notification.read ? "bg-blue-100" : "bg-gray-100"}`}>
+                      <Icon className={`h-5 w-5 ${!notification.read ? "text-blue-600" : "text-gray-600"}`} />
                     </div>
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p
                             className={`font-medium ${
-                              !notification.read
-                                ? "text-gray-900"
-                                : "text-gray-700"
+                              !notification.read ? "text-gray-900" : "text-gray-700"
                             }`}
                           >
                             {notification.title}
                           </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {notification.message}
-                          </p>
+                          <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                         </div>
 
                         <div className="flex items-center gap-2">
                           {!notification.read && (
-                            <Badge
-                              variant="default"
-                              className="shrink-0 select-none"
-                            >
+                            <Badge variant="default" className="shrink-0 select-none">
                               Naujas
                             </Badge>
                           )}
+
                           {/* 🗑 Vieno pranešimo trynimas */}
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
                             onClick={(e) => {
-                              e.stopPropagation() // kad neaktivuotų kortelės click
+                              e.stopPropagation()
                               void deleteNotification(notification.id)
                             }}
                           >
@@ -295,50 +291,43 @@ export default function NotificationsPage() {
                         </div>
                       </div>
 
-                              {notification.type === "group_invite" && (
-    <div
-      className="flex gap-2 mt-3"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <Button
-        size="sm"
-        onClick={async () => {
-          if (!user) return
-          const inviteId = Number(notification.metadata?.inviteId)
-          if (!inviteId) return
+                      {notification.type === "group_invite" && (
+                        <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              if (!user) return
+                              const inviteId = Number(notification.metadata?.inviteId)
+                              if (!inviteId) return
 
-          await groupApi.acceptGroupInvite(inviteId, Number(user.id))
-          await markAsRead(notification.id)
+                              await groupApi.acceptGroupInvite(inviteId, Number(user.id))
+                              await markAsRead(notification.id)
 
-          setNotifications((prev) =>
-            prev.filter((n) => n.id !== notification.id)
-          )
-        }}
-      >
-        Priimti
-      </Button>
+                              setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
+                            }}
+                          >
+                            Priimti
+                          </Button>
 
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={async () => {
-          if (!user) return
-          const inviteId = Number(notification.metadata?.inviteId)
-          if (!inviteId) return
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!user) return
+                              const inviteId = Number(notification.metadata?.inviteId)
+                              if (!inviteId) return
 
-          await groupApi.declineGroupInvite(inviteId, Number(user.id))
-          await markAsRead(notification.id)
+                              await groupApi.declineGroupInvite(inviteId, Number(user.id))
+                              await markAsRead(notification.id)
 
-          setNotifications((prev) =>
-            prev.filter((n) => n.id !== notification.id)
-          )
-        }}
-      >
-        Atmesti
-      </Button>
-    </div>
-  )}
-                      
+                              setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
+                            }}
+                          >
+                            Atmesti
+                          </Button>
+                        </div>
+                      )}
+
                       <p className="text-xs text-gray-500 mt-2">
                         {formatDistanceToNow(notification.timestamp, {
                           addSuffix: true,

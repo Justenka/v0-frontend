@@ -2,6 +2,7 @@ export type ActivityType =
   | "group_created"
   | "member_added"
   | "member_removed"
+  | "member_left"
   | "expense_added"
   | "expense_edited"
   | "expense_deleted"

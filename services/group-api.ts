@@ -135,6 +135,17 @@ export const groupApi = {
   return data.id_grupe ? data : await groupApi.getGroup(groupId)
 },
 
+leaveGroup: async (groupId: number, actorId: number) => {
+  const res = await fetch(`${API_BASE}/api/groups/${groupId}/leave`, {
+    method: "POST",
+    headers: { "x-user-id": String(actorId) },
+  })
+
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.message || "Nepavyko palikti grupės")
+  return data as { ok: boolean }
+},
+
 createInvite: async (groupId: number, actorId: number) => {
   const res = await fetch(`${API_BASE}/api/groups/${groupId}/invites`, {
     method: "POST",
@@ -533,7 +544,6 @@ async updateDebt(
             } as Activity
         })
     },
-
 
     async checkDuplicateDebtName(
     groupId: number, 

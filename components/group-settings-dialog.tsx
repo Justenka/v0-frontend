@@ -54,6 +54,9 @@ export function GroupSettingsDialog({
   const canManageMembers = currentUserRole === "admin"
   const [membersState, setMembersState] = useState(members)
 
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
+
   useEffect(() => {
     setMembersState(members)
   }, [members])
@@ -83,48 +86,47 @@ export function GroupSettingsDialog({
     // Mock: Send invitation
     toast.success(`Kvietimas išsiųstas ${inviteEmail}`)
     setInviteEmail("")
-
-    // Real implementation:
-    /*
-    // Create invitation
-    await supabase.from('group_invitations').insert({
-      group_id: groupId,
-      email: inviteEmail,
-      role: inviteRole,
-      invited_by: user.id
-    })
-
-    // Send notification
-    const invitedUser = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', inviteEmail)
-      .single()
-
-    if (invitedUser.data) {
-      await supabase.from('notifications').insert({
-        user_id: invitedUser.data.id,
-        type: 'group_invite',
-        title: 'Group Invitation',
-        message: `You've been invited to join ${groupTitle}`,
-        action_url: `/groups/${groupId}/accept-invite`
-      })
-    }
-    */
   }
 
-  /*const handleChangeRole = (memberId: string, newRole: UserRole) => {
-    toast.success("Narės rolė pakeista")
+  const canLeaveGroup = () => {
+    if (membersState.length === 1) {
+      return { canLeave: false, reason: "Jūs esate vienintelis narys — tokiu atveju ištrinkite grupę." }
+    }
 
-    // Real implementation:
-    /*
-    await supabase
-      .from('group_permissions')
-      .update({ role: newRole })
-      .eq('group_id', groupId)
-      .eq('user_id', memberId)
-    
-  }*/
+    const me = membersState.find(m => m.id === String(currentUserId))
+    const myBalance = Number(me?.balance ?? 0)
+
+    if (Math.abs(myBalance) > 0.01) {
+      return { canLeave: false, reason: "Negalite palikti grupės, kol neatsiskaitėte (balansas turi būti 0)." }
+    }
+
+    if (currentUserRole === "admin") {
+      const adminCount = membersState.filter(m => m.role === "admin").length
+      if (adminCount <= 1) {
+        return { canLeave: false, reason: "Esate vienintelis administratorius. Pirma perduokite admin teises kitam nariui." }
+      }
+    }
+
+    return { canLeave: true, reason: "" }
+  }
+
+const leaveStatus = canLeaveGroup()
+
+const handleLeaveGroup = async () => {
+  setIsLeaving(true)
+    try {
+      await groupApi.leaveGroup(Number(groupId), currentUserId)
+      toast.success("Palikote grupę")
+      onOpenChange(false)
+      router.push("/")
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e?.message || "Nepavyko palikti grupės")
+    } finally {
+      setIsLeaving(false)
+      setShowLeaveDialog(false)
+    }
+  }
 
   const handleChangeRole = async (memberId: string, newRole: UserRole) => {
   if (!canManageMembers) return
@@ -308,6 +310,28 @@ export function GroupSettingsDialog({
               </div>
             </TabsContent>
             <TabsContent value="danger" className="space-y-4 mt-6">
+            <div className="p-5 border border-orange-300 rounded-lg bg-orange-50">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-6 w-6 text-orange-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-orange-800">Palikti grupę</h3>
+                  <p className="text-sm text-orange-700 mt-1">
+                    {leaveStatus.canLeave
+                      ? "Jūs išeisite iš grupės ir nebegalėsite jos matyti, kol vėl nebūsite pakviestas."
+                      : leaveStatus.reason}
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowLeaveDialog(true)}
+                  disabled={!leaveStatus.canLeave}
+                >
+                  Palikti
+                </Button>
+              </div>
+            </div>
+            </TabsContent>
+            <TabsContent value="danger" className="space-y-4 mt-6">
               <div className="p-5 border border-red-300 rounded-lg bg-red-50">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
@@ -360,6 +384,30 @@ export function GroupSettingsDialog({
               className="bg-red-600 hover:bg-red-700"
             >
               {isDeleting ? "Trinamas..." : "Taip, ištrinti grupę"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Ar tikrai norite palikti šią grupę?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Jūs ketinate palikti grupę <strong>"{groupTitle}"</strong>. Vėliau prisijungti galėsite tik gavę kvietimą.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLeaving}>Atšaukti</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLeaveGroup}
+              disabled={isLeaving}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isLeaving ? "Paliekama..." : "Taip, palikti grupę"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
