@@ -14,13 +14,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Settings, UserPlus, Shield, Trash2, Link2, Copy, Check, AlertTriangle } from "lucide-react"
+import { Settings, Shield, Trash2, AlertTriangle, UserMinus } from "lucide-react"
 import { toast } from "sonner"
 import type { UserRole } from "@/types/user"
 import { groupApi } from "@/services/group-api"
@@ -47,7 +45,6 @@ export function GroupSettingsDialog({
   onRolesUpdated,
 }: GroupSettingsDialogProps) {
   const router = useRouter()
-  const [inviteEmail, setInviteEmail] = useState("")
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -57,51 +54,50 @@ export function GroupSettingsDialog({
   const [showLeaveDialog, setShowLeaveDialog] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
+  // remove member confirm
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null)
+  const [isRemoving, setIsRemoving] = useState(false)
+
+  // ✅ per-member remove errors (rodoma tame pačiame nario box'e)
+  const [removeErrorByMemberId, setRemoveErrorByMemberId] = useState<Record<string, string>>({})
+
   useEffect(() => {
     setMembersState(members)
+    setRemoveErrorByMemberId({})
   }, [members])
 
-
   const canDeleteGroup = () => {
-    // Only admins can delete
     if (!canManageMembers) return { canDelete: false, reason: "Tik administratoriai gali ištrinti grupę" }
-
-    // Check if user is the only member
     if (members.length === 1) return { canDelete: true, reason: "" }
 
-    // Check if all balances are zero (no unpaid debts)
-    const hasUnpaidDebts = members.some((m) => m.balance && Math.abs(m.balance) > 0.01)
-    if (hasUnpaidDebts) {
-      return { canDelete: false, reason: "Negalima ištrinti grupės, kol yra neapmokėtų skolų" }
-    }
+    const hasUnpaidDebts = members.some((m) => typeof m.balance === "number" && Math.abs(m.balance) > 0.01)
+    if (hasUnpaidDebts) return { canDelete: false, reason: "Negalima ištrinti grupės, kol yra neapmokėtų skolų" }
 
     return { canDelete: true, reason: "" }
   }
 
   const deleteStatus = canDeleteGroup()
 
-  const handleInviteMember = () => {
-    if (!inviteEmail) return
-
-    // Mock: Send invitation
-    toast.success(`Kvietimas išsiųstas ${inviteEmail}`)
-    setInviteEmail("")
-  }
-
   const canLeaveGroup = () => {
     if (membersState.length === 1) {
       return { canLeave: false, reason: "Jūs esate vienintelis narys — tokiu atveju ištrinkite grupę." }
     }
 
-    const me = membersState.find(m => m.id === String(currentUserId))
+    const me = membersState.find((m) => m.id === String(currentUserId))
+    const myBalanceKnown = me?.balance !== undefined && me?.balance !== null
     const myBalance = Number(me?.balance ?? 0)
+
+    if (!myBalanceKnown) {
+      return { canLeave: false, reason: "Nepavyko nustatyti balanso. Atnaujinkite puslapį." }
+    }
 
     if (Math.abs(myBalance) > 0.01) {
       return { canLeave: false, reason: "Negalite palikti grupės, kol neatsiskaitėte (balansas turi būti 0)." }
     }
 
     if (currentUserRole === "admin") {
-      const adminCount = membersState.filter(m => m.role === "admin").length
+      const adminCount = membersState.filter((m) => m.role === "admin").length
       if (adminCount <= 1) {
         return { canLeave: false, reason: "Esate vienintelis administratorius. Pirma perduokite admin teises kitam nariui." }
       }
@@ -110,10 +106,10 @@ export function GroupSettingsDialog({
     return { canLeave: true, reason: "" }
   }
 
-const leaveStatus = canLeaveGroup()
+  const leaveStatus = canLeaveGroup()
 
-const handleLeaveGroup = async () => {
-  setIsLeaving(true)
+  const handleLeaveGroup = async () => {
+    setIsLeaving(true)
     try {
       await groupApi.leaveGroup(Number(groupId), currentUserId)
       toast.success("Palikote grupę")
@@ -129,46 +125,34 @@ const handleLeaveGroup = async () => {
   }
 
   const handleChangeRole = async (memberId: string, newRole: UserRole) => {
-  if (!canManageMembers) return
+    if (!canManageMembers) return
 
     if (!currentUserId) {
       toast.error("Turite būti prisijungęs")
       return
     }
 
+    try {
+      const res = await groupApi.updateMemberRole(Number(groupId), Number(memberId), newRole, currentUserId)
 
-  try {
-    const res = await groupApi.updateMemberRole(
-      Number(groupId),
-      Number(memberId),
-      newRole,
-      currentUserId
-    )
+      setMembersState((prev) => {
+        if (res?.transferred) {
+          return prev.map((m) => {
+            if (m.id === memberId) return { ...m, role: "admin" as UserRole }
+            if (m.id === String(currentUserId)) return { ...m, role: "member" as UserRole }
+            return m
+          })
+        }
+        return prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+      })
 
-    // UI update
-    setMembersState((prev) => {
-      // if backend transferred admin to someone else:
-      if (res?.transferred) {
-        return prev.map((m) => {
-          if (m.id === memberId) return { ...m, role: "admin" as UserRole }
-          if (m.id === String(currentUserId)) return { ...m, role: "member" as UserRole }
-          return m
-        })
-      }
+      toast.success("Nario rolė pakeista")
+    } catch (e: any) {
+      toast.error(e?.message || "Nepavyko pakeisti rolės")
+    }
 
-      // normal role change
-      return prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
-    })
-
-    toast.success("Nario rolė pakeista")
-  } catch (e: any) {
-    toast.error(e?.message || "Nepavyko pakeisti rolės")
+    if (onRolesUpdated) onRolesUpdated()
   }
-  if (onRolesUpdated) {
-    onRolesUpdated()
-  }
-}
-
 
   const getRoleBadgeVariant = (role: UserRole) => {
     switch (role) {
@@ -217,6 +201,94 @@ const handleLeaveGroup = async () => {
     }
   }
 
+  // ✅ gražinam žmogui suprantamą pašalinimo klaidą
+  const explainRemoveError = (raw: string) => {
+    const msg = (raw || "").toLowerCase()
+
+    if (msg.includes("atsiskait") || msg.includes("neapmok") || msg.includes("skol")) {
+      return "Negalima pašalinti, nes šis narys dar nėra pilnai atsiskaitęs su grupės nariais."
+    }
+    if (msg.includes("paskutin") && msg.includes("administrator")) {
+      return "Negalima pašalinti, nes tai paskutinis administratorius. Pirma priskirkite admin kitam nariui."
+    }
+    if (msg.includes("savinink") || msg.includes("owner")) {
+      return "Negalima pašalinti grupės savininko. Pirma perduokite administratoriaus teises/owner kitam nariui."
+    }
+    if (msg.includes("tik administrator")) {
+      return "Tik administratoriai gali šalinti narius."
+    }
+
+    return raw || "Nepavyko pašalinti nario."
+  }
+
+  // ✅ click ant "Pašalinti": nieko nerašom boxe, bet jei yra klaida – parodom tame boxe
+  const handleRemoveClick = (member: { id: string; name: string; role: UserRole }) => {
+    // išvalom konkretaus nario seną klaidą
+    setRemoveErrorByMemberId((prev) => {
+      const next = { ...prev }
+      delete next[member.id]
+      return next
+    })
+
+    if (!canManageMembers) {
+      setRemoveErrorByMemberId((prev) => ({ ...prev, [member.id]: "Tik administratoriai gali šalinti narius." }))
+      return
+    }
+
+    // neleidžiam pašalinti savęs, jei esi vienintelis admin
+    const isSelfAdmin = member.id === String(currentUserId) && member.role === "admin"
+    if (isSelfAdmin) {
+      const adminCount = membersState.filter((m) => m.role === "admin").length
+      if (adminCount <= 1) {
+        setRemoveErrorByMemberId((prev) => ({
+          ...prev,
+          [member.id]: "Negalite pašalinti savęs, nes esate vienintelis administratorius. Pirma perduokite admin teises kitam nariui.",
+        }))
+        return
+      }
+    }
+
+    setRemoveTarget({ id: member.id, name: member.name, role: member.role })
+    setRemoveDialogOpen(true)
+  }
+
+  const handleRemoveMemberConfirmed = async () => {
+    if (!canManageMembers) return
+    if (!removeTarget) return
+
+    const memberIdNum = Number(removeTarget.id)
+    if (!memberIdNum) {
+      toast.error("Blogas nario ID")
+      return
+    }
+
+    setIsRemoving(true)
+    try {
+      await groupApi.removeMember(Number(groupId), memberIdNum, currentUserId)
+
+      setMembersState((prev) => prev.filter((m) => m.id !== removeTarget.id))
+
+      // išvalom jo klaidą, jei buvo
+      setRemoveErrorByMemberId((prev) => {
+        const next = { ...prev }
+        delete next[removeTarget.id]
+        return next
+      })
+
+      toast.success("Narys pašalintas")
+      setRemoveDialogOpen(false)
+      setRemoveTarget(null)
+
+      if (onRolesUpdated) onRolesUpdated()
+    } catch (e: any) {
+      const pretty = explainRemoveError(e?.message || "")
+      setRemoveErrorByMemberId((prev) => ({ ...prev, [removeTarget.id]: pretty }))
+      setRemoveDialogOpen(false) // uždarom confirm, o paaiškinimą rodom nario box'e
+    } finally {
+      setIsRemoving(false)
+    }
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -232,7 +304,9 @@ const handleLeaveGroup = async () => {
           <Tabs defaultValue="members" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="members">Nariai ({membersState.length})</TabsTrigger>
-              <TabsTrigger value="danger" className="text-red-600">Pavojinga zona</TabsTrigger>
+              <TabsTrigger value="danger" className="text-red-600">
+                Pavojinga zona
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="members" className="space-y-4 mt-4">
@@ -254,34 +328,50 @@ const handleLeaveGroup = async () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {canManageMembers ? (
-                          <>
-                            <Select
-                              value={member.role}
-                              disabled={isSelfAdmin}
-                              onValueChange={(value) => handleChangeRole(member.id, value as UserRole)}
-                            >
-                              <SelectTrigger className="w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Administratorius</SelectItem>
-                                <SelectItem value="member">Narys</SelectItem>
-                                <SelectItem value="guest">Svečias</SelectItem>
-                              </SelectContent>
-                            </Select>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          {canManageMembers ? (
+                            <>
+                              <Select
+                                value={member.role}
+                                disabled={isSelfAdmin}
+                                onValueChange={(value) => handleChangeRole(member.id, value as UserRole)}
+                              >
+                                <SelectTrigger className="w-[150px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Administratorius</SelectItem>
+                                  <SelectItem value="member">Narys</SelectItem>
+                                  <SelectItem value="guest">Svečias</SelectItem>
+                                </SelectContent>
+                              </Select>
 
-                            {isSelfAdmin && (
-                              <p className="text-xs text-gray-500 max-w-[220px]">
-                                Norėdami perduoti administratoriaus teises, priskirkite „Administratorius“ kitam nariui.
-                              </p>
-                            )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleRemoveClick({ id: member.id, name: member.name, role: member.role })}
+                                disabled={isSelfAdmin}
+                                title={
+                                  isSelfAdmin
+                                    ? "Pirmiausia perduokite admin teises kitam nariui"
+                                    : "Pašalinti narį"
+                                }
+                              >
+                                <UserMinus className="h-4 w-4 mr-2" />
+                                Pašalinti
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge variant={getRoleBadgeVariant(member.role)}>{getRoleLabel(member.role)}</Badge>
+                          )}
+                        </div>
 
-
-                          </>
-                        ) : (
-                          <Badge variant={getRoleBadgeVariant(member.role)}>{getRoleLabel(member.role)}</Badge>
+                        {/* ✅ čia “tas pats boxas”: default tuščias, bet jei klaida – rodome */}
+                        {!!removeErrorByMemberId[member.id] && (
+                          <div className="max-w-[360px] rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                            {removeErrorByMemberId[member.id]}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -308,46 +398,49 @@ const handleLeaveGroup = async () => {
                   </div>
                 </div>
               </div>
-            </TabsContent>
-            <TabsContent value="danger" className="space-y-4 mt-6">
-            <div className="p-5 border border-orange-300 rounded-lg bg-orange-50">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-6 w-6 text-orange-600 mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-orange-800">Palikti grupę</h3>
-                  <p className="text-sm text-orange-700 mt-1">
-                    {leaveStatus.canLeave
-                      ? "Jūs išeisite iš grupės ir nebegalėsite jos matyti, kol vėl nebūsite pakviestas."
-                      : leaveStatus.reason}
-                  </p>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-slate-700 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-900 mb-1">Administratoriaus teisių perdavimas</p>
+                    <p className="text-slate-700">
+                      Jei esate vienintelis administratorius, negalėsite palikti grupės ar pašalinti savęs, kol nepriskirsite
+                      „Administratorius“ rolės kitam nariui. Pasirinkite narį sąraše ir pakeiskite jo rolę į „Administratorius“.
+                    </p>
+                  </div>
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowLeaveDialog(true)}
-                  disabled={!leaveStatus.canLeave}
-                >
-                  Palikti
-                </Button>
               </div>
-            </div>
             </TabsContent>
+
             <TabsContent value="danger" className="space-y-4 mt-6">
+              <div className="p-5 border border-orange-300 rounded-lg bg-orange-50">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-6 w-6 text-orange-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-orange-800">Palikti grupę</h3>
+                    <p className="text-sm text-orange-700 mt-1">
+                      {leaveStatus.canLeave
+                        ? "Jūs išeisite iš grupės ir nebegalėsite jos matyti, kol vėl nebūsite pakviestas."
+                        : leaveStatus.reason}
+                    </p>
+                  </div>
+                  <Button variant="destructive" onClick={() => setShowLeaveDialog(true)} disabled={!leaveStatus.canLeave}>
+                    Palikti
+                  </Button>
+                </div>
+              </div>
+
               <div className="p-5 border border-red-300 rounded-lg bg-red-50">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-red-800">Ištrinti grupę</h3>
                     <p className="text-sm text-red-700 mt-1">
-                      {deleteStatus.canDelete
-                        ? "Šis veiksmas negrįžtamas. Visi duomenys bus prarasti."
-                        : deleteStatus.reason}
+                      {deleteStatus.canDelete ? "Šis veiksmas negrįžtamas. Visi duomenys bus prarasti." : deleteStatus.reason}
                     </p>
                   </div>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={!deleteStatus.canDelete}
-                  >
+                  <Button variant="destructive" onClick={() => setShowDeleteDialog(true)} disabled={!deleteStatus.canDelete}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Ištrinti
                   </Button>
@@ -358,6 +451,40 @@ const handleLeaveGroup = async () => {
         </DialogContent>
       </Dialog>
 
+      {/* Remove member confirm */}
+      <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Pašalinti narį?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {removeTarget ? (
+                  <div>
+                    Jūs ketinate pašalinti narį: <span className="font-medium">{removeTarget.name}</span>.
+                  </div>
+                ) : (
+                  <div>Pasirinkite narį.</div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemoving}>Atšaukti</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveMemberConfirmed}
+              disabled={isRemoving || !removeTarget}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isRemoving ? "Šalinama..." : "Taip, pašalinti"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete group */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -367,9 +494,7 @@ const handleLeaveGroup = async () => {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <div>
-                  Jūs ketinate ištrinti grupę.
-                </div>
+                <div>Jūs ketinate ištrinti grupę.</div>
                 <div className="text-red-600 font-medium">
                   Šis veiksmas negrįžtamas. Visi duomenys, įskaitant išlaidas, pranešimus ir istoriją, bus prarasti.
                 </div>
@@ -389,6 +514,7 @@ const handleLeaveGroup = async () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Leave group */}
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

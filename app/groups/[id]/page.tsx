@@ -29,7 +29,6 @@ import { groupApi } from "@/services/group-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/types/user"
 import PaymentHistory from "@/components/payment-history"
-import type { BackendGroupForUser } from "@/types/backend"
 import type { Category } from "@/types/category"
 import { toast } from "sonner"
 
@@ -45,7 +44,7 @@ export default function GroupPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<UserRole>("guest")
-  const [isPublicView, setIsPublicView] = useState(false) // NAUJAS STATE
+  const [isPublicView, setIsPublicView] = useState(false)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview")
@@ -55,21 +54,21 @@ export default function GroupPage() {
     transaction: Transaction | null
   }>({ open: false, transaction: null })
 
-  // Auth guard - PAKEISTAS: nebenukreipia į login jei nėra user
   useEffect(() => {
     if (!isLoading && !user) {
-      // Jei nėra vartotojo, leidžiame viešą peržiūrą
       setIsPublicView(true)
       setUserRole("guest")
     }
   }, [isLoading, user])
 
-  const groupMembers = members.map((member) => ({
-    id: member.id.toString(),
-    name: member.name,
-    email: member.email,
-    role: member.role,
-  }))
+  // ✅ SVARBU: perduodam ir balance (globalus grupės balansas)
+const groupMembers = members.map((member: any) => ({
+  id: String(member.id),
+  name: member.name,
+  email: member.email,
+  role: member.role,
+  balance: typeof member.balance === "number" ? member.balance : Number(member.balance ?? 0),
+}))
 
   useEffect(() => {
     if (!groupId || Number.isNaN(groupId)) return
@@ -103,7 +102,6 @@ export default function GroupPage() {
       if (isLoading) return
 
       try {
-        // Fetch globalios kategorijos
         try {
           const allCategories = await groupApi.getCategories()
           setCategories(allCategories)
@@ -111,10 +109,9 @@ export default function GroupPage() {
           console.error("Nepavyko įkelti kategorijų:", error)
         }
 
-        // PAKEISTA LOGIKA: jei user yra, gauname rolę, jei ne - guest
         if (user) {
           const userId = Number(user.id)
-          
+
           try {
             const role = await groupApi.getUserRoleInGroup(groupId, userId)
             setUserRole(role)
@@ -125,21 +122,17 @@ export default function GroupPage() {
             setIsPublicView(true)
           }
         } else {
-          // Nėra user - viešas režimas
           setIsPublicView(true)
           setUserRole("guest")
         }
 
-        // Gauname grupės duomenis (dabar veikia ir be autentifikacijos)
         const fullGroupData = await groupApi.getGroup(groupId)
         setGroup(fullGroupData)
         setMembers(fullGroupData.members || [])
-        
-        // Jei yra transactions iš backend (naujas endpoint turi juos)
-        if (fullGroupData.transactions) {
-          setTransactions(fullGroupData.transactions)
+
+        if ((fullGroupData as any).transactions) {
+          setTransactions((fullGroupData as any).transactions)
         } else {
-          // Fallback - gauname per debts endpoint
           const debts = await groupApi.getDebtsByGroup(groupId)
           const mappedTransactions = debts.map((d: any) => ({
             id: d.id_skola,
@@ -187,9 +180,7 @@ export default function GroupPage() {
       const normalizedName = name.toLowerCase()
       const isDuplicate = members.some((member) => member.name.toLowerCase() === normalizedName)
 
-      if (isDuplicate) {
-        return false
-      }
+      if (isDuplicate) return false
 
       const updatedGroup = await groupApi.addMember(groupId, name, Number(user.id))
       if (updatedGroup) {
@@ -202,21 +193,6 @@ export default function GroupPage() {
       console.error("Failed to add member:", error)
       return false
     }
-  }
-
-  const handleRemoveMember = async (memberId: number) => {
-    if (!user) {
-      toast.error("Neprisijungęs vartotojas")
-      return false
-    }
-
-    if (userRole !== "admin") {
-      alert("Tik administratoriai gali šalinti narius")
-      return
-    }
-
-    await groupApi.removeMember(groupId, memberId, Number(user.id))
-    setMembers((prev) => prev.filter((m) => m.id !== memberId))
   }
 
   const handleSettleUp = async (memberId: number, amount: number) => {
@@ -262,14 +238,14 @@ export default function GroupPage() {
         amount: Number(d.suma),
         currency:
           d.valiutos_kodas === 1 ? "EUR" :
-          d.valiutos_kodas === 2 ? "USD" : 
+          d.valiutos_kodas === 2 ? "USD" :
           d.valiutos_kodas === 3 ? "PLN" :
           d.valiutos_kodas === 4 ? "GBP" :
           d.valiutos_kodas === 5 ? "JPY" : "UNKNOWN",
         date: d.sukurimo_data,
         paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
         categoryId: d.kategorija ? String(d.kategorija) : null,
-        splitType: "Lygiai"
+        splitType: "Lygiai",
       }))
       setTransactions(mappedTransactions)
     } catch (error) {
@@ -323,26 +299,13 @@ export default function GroupPage() {
         date: d.sukurimo_data,
         paidBy: `${d.creator_vardas} ${d.creator_pavarde}`,
         categoryId: d.kategorija ? String(d.kategorija) : null,
-        splitType: "Lygiai"
+        splitType: "Lygiai",
       }))
       setTransactions(mappedTransactions)
     } catch (error) {
       console.error("Failed to refresh group data:", error)
     }
   }
-
-  const refreshUserRole = async () => {
-  if (!user) return
-  try {
-    const role = await groupApi.getUserRoleInGroup(groupId, Number(user.id))
-    setUserRole(role)
-    setIsPublicView(role === "guest")
-  } catch {
-    setUserRole("guest")
-    setIsPublicView(true)
-  }
-}
-
 
   if (loading) {
     return (
@@ -374,17 +337,12 @@ export default function GroupPage() {
 
   return (
     <div className="container max-w-4xl py-10">
-      {/* NAUJAS: Viešo režimo indikatorius */}
       {isPublicView && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
           <Lock className="h-5 w-5 text-blue-600" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-blue-900">
-              Peržiūrite grupę kaip svečias
-            </p>
-            <p className="text-xs text-blue-700">
-              Prisijunkite norėdami pridėti išlaidas ar valdyti grupę
-            </p>
+            <p className="text-sm font-medium text-blue-900">Peržiūrite grupę kaip svečias</p>
+            <p className="text-xs text-blue-700">Prisijunkite norėdami pridėti išlaidas ar valdyti grupę</p>
           </div>
           <Link href="/login">
             <Button size="sm" variant="default">
@@ -401,7 +359,7 @@ export default function GroupPage() {
         </Link>
 
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">{group.pavadinimas}</h1>
+          <h1 className="text-3xl font-bold">{(group as any).pavadinimas ?? (group as any).title}</h1>
           <div className="flex items-center gap-2">
             {!isPublicView && (
               <>
@@ -423,6 +381,7 @@ export default function GroupPage() {
                   <Settings className="h-4 w-4 mr-2" />
                   Nustatymai
                 </Button>
+
                 {canAddExpense ? (
                   <Link href={`/groups/${groupId}/transactions/new`}>
                     <Button>
@@ -457,7 +416,6 @@ export default function GroupPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Nariai - rodome tik viešoje peržiūroje be balansų */}
           {!isPublicView && (
             <Card>
               <CardHeader>
@@ -472,10 +430,9 @@ export default function GroupPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <MembersList 
-                  members={members} 
-                  onSettleUp={handleSettleUp} 
-                  onRemoveMember={handleRemoveMember} 
+                <MembersList
+                  members={members}
+                  onSettleUp={handleSettleUp}
                   groupId={groupId}
                   onBalanceUpdate={refreshGroupData}
                 />
@@ -485,7 +442,6 @@ export default function GroupPage() {
 
           {!isPublicView && <PaymentHistory groupId={groupId} />}
 
-          {/* Išlaidos - rodoma VISIEMS (ir viešai) */}
           <Card>
             <CardHeader>
               <CardTitle>Išlaidos</CardTitle>
@@ -534,7 +490,7 @@ export default function GroupPage() {
             open={isSettingsOpen}
             onOpenChange={setIsSettingsOpen}
             groupId={groupId.toString()}
-            groupTitle={group.title}
+            groupTitle={(group as any).title ?? (group as any).pavadinimas ?? ""}
             members={groupMembers}
             currentUserRole={userRole}
             currentUserId={user ? Number(user.id) : 0}
