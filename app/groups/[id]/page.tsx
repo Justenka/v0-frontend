@@ -331,6 +331,19 @@ export default function GroupPage() {
     }
   }
 
+  const refreshUserRole = async () => {
+  if (!user) return
+  try {
+    const role = await groupApi.getUserRoleInGroup(groupId, Number(user.id))
+    setUserRole(role)
+    setIsPublicView(role === "guest")
+  } catch {
+    setUserRole("guest")
+    setIsPublicView(true)
+  }
+}
+
+
   if (loading) {
     return (
       <div className="container max-w-4xl py-10">
@@ -525,6 +538,18 @@ export default function GroupPage() {
             groupTitle={group.title}
             members={groupMembers}
             currentUserRole={userRole}
+            currentUserId={user ? Number(user.id) : 0}
+            onRolesUpdated={async () => {
+              if (!user) return
+
+              try {
+                const role = await groupApi.getUserRoleInGroup(groupId, Number(user.id))
+                setUserRole(role)
+                await refreshGroupData()
+              } catch {
+                setUserRole("guest")
+              }
+            }}
           />
 
           <EditTransactionDialog

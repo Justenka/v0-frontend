@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -32,6 +32,8 @@ interface GroupSettingsDialogProps {
   groupTitle: string
   members: Array<{ id: string; name: string; email: string; role: UserRole; balance?: number }>
   currentUserRole: UserRole
+  currentUserId: number
+  onRolesUpdated?: () => void
 }
 
 export function GroupSettingsDialog({
@@ -41,6 +43,8 @@ export function GroupSettingsDialog({
   groupTitle,
   members,
   currentUserRole,
+  currentUserId,
+  onRolesUpdated,
 }: GroupSettingsDialogProps) {
   const router = useRouter()
   const [inviteEmail, setInviteEmail] = useState("")
@@ -48,6 +52,12 @@ export function GroupSettingsDialog({
   const [isDeleting, setIsDeleting] = useState(false)
 
   const canManageMembers = currentUserRole === "admin"
+  const [membersState, setMembersState] = useState(members)
+
+  useEffect(() => {
+    setMembersState(members)
+  }, [members])
+
 
   const canDeleteGroup = () => {
     // Only admins can delete
@@ -103,7 +113,7 @@ export function GroupSettingsDialog({
     */
   }
 
-  const handleChangeRole = (memberId: string, newRole: UserRole) => {
+  /*const handleChangeRole = (memberId: string, newRole: UserRole) => {
     toast.success("Narės rolė pakeista")
 
     // Real implementation:
@@ -113,8 +123,50 @@ export function GroupSettingsDialog({
       .update({ role: newRole })
       .eq('group_id', groupId)
       .eq('user_id', memberId)
-    */
+    
+  }*/
+
+  const handleChangeRole = async (memberId: string, newRole: UserRole) => {
+  if (!canManageMembers) return
+
+    if (!currentUserId) {
+      toast.error("Turite būti prisijungęs")
+      return
+    }
+
+
+  try {
+    const res = await groupApi.updateMemberRole(
+      Number(groupId),
+      Number(memberId),
+      newRole,
+      currentUserId
+    )
+
+    // UI update
+    setMembersState((prev) => {
+      // if backend transferred admin to someone else:
+      if (res?.transferred) {
+        return prev.map((m) => {
+          if (m.id === memberId) return { ...m, role: "admin" as UserRole }
+          if (m.id === String(currentUserId)) return { ...m, role: "member" as UserRole }
+          return m
+        })
+      }
+
+      // normal role change
+      return prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+    })
+
+    toast.success("Nario rolė pakeista")
+  } catch (e: any) {
+    toast.error(e?.message || "Nepavyko pakeisti rolės")
   }
+  if (onRolesUpdated) {
+    onRolesUpdated()
+  }
+}
+
 
   const handleRemoveMember = (memberId: string) => {
     toast.success("Narys pašalintas iš grupės")
@@ -190,52 +242,70 @@ export function GroupSettingsDialog({
 
           <Tabs defaultValue="members" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="members">Nariai ({members.length})</TabsTrigger>
+              <TabsTrigger value="members">Nariai ({membersState.length})</TabsTrigger>
               <TabsTrigger value="danger" className="text-red-600">Pavojinga zona</TabsTrigger>
             </TabsList>
 
             <TabsContent value="members" className="space-y-4 mt-4">
               <div className="space-y-3">
-                {members.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src="/placeholder.svg" alt={member.name} />
-                        <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-gray-600">{member.email}</p>
+                {membersState.map((member) => {
+                  const isSelf = member.id === String(currentUserId)
+                  const isSelfAdmin = isSelf && member.role === "admin"
+
+                  return (
+                    <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src="/placeholder.svg" alt={member.name} />
+                          <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{member.name}</p>
+                          <p className="text-sm text-gray-600">{member.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {canManageMembers ? (
+                          <>
+                            <Select
+                              value={member.role}
+                              disabled={isSelfAdmin}
+                              onValueChange={(value) => handleChangeRole(member.id, value as UserRole)}
+                            >
+                              <SelectTrigger className="w-[150px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Administratorius</SelectItem>
+                                <SelectItem value="member">Narys</SelectItem>
+                                <SelectItem value="guest">Svečias</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {isSelfAdmin && (
+                              <p className="text-xs text-gray-500 max-w-[220px]">
+                                Norėdami perduoti administratoriaus teises, priskirkite „Administratorius“ kitam nariui.
+                              </p>
+                            )}
+
+                            {member.role !== "admin" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMember(member.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant={getRoleBadgeVariant(member.role)}>{getRoleLabel(member.role)}</Badge>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {canManageMembers ? (
-                        <>
-                          <Select
-                            value={member.role}
-                            onValueChange={(value) => handleChangeRole(member.id, value as UserRole)}
-                          >
-                            <SelectTrigger className="w-[150px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Administratorius</SelectItem>
-                              <SelectItem value="member">Narys</SelectItem>
-                              <SelectItem value="guest">Svečias</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {member.role !== "admin" && (
-                            <Button variant="ghost" size="icon" onClick={() => handleRemoveMember(member.id)}>
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <Badge variant={getRoleBadgeVariant(member.role)}>{getRoleLabel(member.role)}</Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">

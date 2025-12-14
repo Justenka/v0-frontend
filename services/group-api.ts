@@ -36,6 +36,7 @@ export const groupApi = {
     }
     
     const data = await res.json()
+    console.log("getUserRoleInGroup response:", data)
     return data.amount
   },
 
@@ -354,19 +355,49 @@ declineGroupInvite: async (inviteId: number, userId: number) => {
     },
 
     async getUserRoleInGroup(groupId: number, userId: number): Promise<UserRole> {
-        const res = await fetch(`${API_BASE}/api/grupes/${groupId}/nariai/${userId}/role`, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
+  const res = await fetch(`${API_BASE}/api/grupes/${groupId}/nariai/${userId}/role`, {
+    cache: "no-store",
+  })
+
+  if (!res.ok) throw new Error("Nepavyko gauti rolės")
+
+  const data = await res.json()
+
+  switch (Number(data.role)) {
+    case 3:
+      return "admin"
+    case 2:
+      return "member"
+    case 1:
+      return "guest"
+    default:
+      return "member"
+  }
+},
+
+
+    updateMemberRole: async (
+        groupId: number,
+        memberUserId: number,
+        newRole: "admin" | "member" | "guest",
+        actorId: number
+        ) => {
+        const roleMap = { guest: 1, member: 2, admin: 3 } as const
+
+        const res = await fetch(`${API_BASE}/api/groups/${groupId}/members/${memberUserId}/role`, {
+            method: "PUT",
+            headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(actorId),
+            },
+            body: JSON.stringify({ role: roleMap[newRole] }),
         })
 
-        if (!res.ok) {
-            throw new Error("Nepavyko gauti vartotojo rolės")
-        }
+        const data = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(data?.message || "Nepavyko pakeisti rolės")
+        return data as { ok: boolean; transferred?: boolean }
+        },
 
-        const data = await res.json()
-        console.log(data.roleText);
-        return data.roleText as UserRole
-    },
 
     //------------------------------------------------------------------------------------------------------------------------
 
