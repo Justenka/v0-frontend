@@ -211,16 +211,22 @@ export default function NotificationsPage() {
     }
   }
 
+  // ✅ server-side delete (kad po refresh nebegrįžtų)
+  const deleteNotificationServer = async (id: string) => {
+    if (!user) return
+    await fetch(`${API_BASE}/api/notifications/${id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    })
+  }
+
   const deleteNotification = async (id: string) => {
     if (!user) return
     setNotifications((prev) => prev.filter((n) => n.id !== id))
 
     try {
-      await fetch(`${API_BASE}/api/notifications/${id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      })
+      await deleteNotificationServer(id)
     } catch (err) {
       console.error("Delete notification error:", err)
     }
@@ -248,7 +254,6 @@ export default function NotificationsPage() {
     void markAsRead(notification.id)
 
     if (isGroupInviteNotification(notification)) {
-      // jei nori – gali net ir nedaryti markAsRead čia
       return
     }
 
@@ -297,7 +302,16 @@ export default function NotificationsPage() {
         await groupApi.declineGroupInvite(pendingInviteId, Number(user.id))
       }
 
-      await markAsRead(pendingNotificationId)
+      // ✅ kad refresh negrąžintų – TRINAM pranešimą iš DB
+      try {
+        await deleteNotificationServer(pendingNotificationId)
+      } catch (e) {
+        // jei delete nepavyksta, bent jau pažymim kaip perskaitytą
+        console.error("[Invite] Notification delete failed, fallback to read:", e)
+        await markAsRead(pendingNotificationId)
+      }
+
+      // ✅ UI
       setNotifications((prev) => prev.filter((n) => n.id !== pendingNotificationId))
       closeInviteConfirm()
     } catch (e) {
@@ -419,7 +433,8 @@ export default function NotificationsPage() {
                           </div>
                         </div>
 
-                        {isInvite && (
+                        {/* ✅ rekomenduoju rodyti tik jei notifas dar neperskaitytas */}
+                        {isInvite && !notification.read && (
                           <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                             <Button size="sm" onClick={() => openInviteConfirm("accept", notification)}>
                               Priimti
