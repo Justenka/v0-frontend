@@ -368,7 +368,7 @@ const handleLeaveGroup = async () => {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <div>
-                  Jūs ketinate ištrinti grupę <strong>"{groupTitle}"</strong>.
+                  Jūs ketinate ištrinti grupę.
                 </div>
                 <div className="text-red-600 font-medium">
                   Šis veiksmas negrįžtamas. Visi duomenys, įskaitant išlaidas, pranešimus ir istoriją, bus prarasti.
@@ -397,7 +397,7 @@ const handleLeaveGroup = async () => {
               Ar tikrai norite palikti šią grupę?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Jūs ketinate palikti grupę <strong>"{groupTitle}"</strong>. Vėliau prisijungti galėsite tik gavę kvietimą.
+              Jūs ketinate palikti grupę. Vėliau prisijungti galėsite tik gavę kvietimą.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
