@@ -403,6 +403,18 @@ export function GroupSettingsDialog({
                   </div>
                 </div>
               </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-slate-700 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-900 mb-1">Administratoriaus teisių perdavimas</p>
+                    <p className="text-slate-700">
+                      Jei esate vienintelis administratorius, negalėsite palikti grupės ar pašalinti savęs, kol nepriskirsite
+                      „Administratorius“ rolės kitam nariui. Pasirinkite narį sąraše ir pakeiskite jo rolę į „Administratorius“.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="danger" className="space-y-4 mt-6">
