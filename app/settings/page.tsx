@@ -29,12 +29,9 @@ export default function SettingsPage() {
   const { user, isLoading } = useAuth();
 
   // Pranešimai
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
   const [friendRequests, setFriendRequests] = useState(true);
 
   // UI „tipai“ (kol kas tik front-end dekoracija, jei nori – vėliau irgi išsaugosim)
-  const [groupInvites, setGroupInvites] = useState(true);
   const [newExpenses, setNewExpenses] = useState(true);
   const [paymentReminders, setPaymentReminders] = useState(true);
   const [messages, setMessages] = useState(true);
@@ -71,10 +68,7 @@ export default function SettingsPage() {
       )
       if (notifResp.ok) {
         const notifData = await notifResp.json()
-        setEmailNotifications(!!notifData.el_pastas_aktyvus)
-        setPushNotifications(!!notifData.push_pranesimai)
         setFriendRequests(!!notifData.draugu_kvietimai)
-        setGroupInvites(!!notifData.grupes_kvietimai)
         setNewExpenses(!!notifData.naujos_islaidos)
         setPaymentReminders(!!notifData.mokejimo_priminimai)
         setMessages(!!notifData.zinutes)
@@ -112,10 +106,7 @@ export default function SettingsPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            el_pastas_aktyvus: emailNotifications,
-            push_pranesimai: pushNotifications,
             draugu_kvietimai: friendRequests,
-            grupes_kvietimai: groupInvites,
             naujos_islaidos: newExpenses,
             mokejimo_priminimai: paymentReminders,
             zinutes: messages,
@@ -196,36 +187,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             {/* Bendrai */}
             <div className="space-y-4">
-              {/* <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>El. pašto pranešimai</Label>
-                  <p className="text-sm text-gray-600">
-                    Gauti pranešimus el. paštu
-                  </p>
-                </div>
-                <Switch
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                />
-              </div>
-
               <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Push pranešimai</Label>
-                  <p className="text-sm text-gray-600">
-                    Gauti pranešimus naršyklėje
-                  </p>
-                </div>
-                <Switch
-                  checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
-                />
-              </div> */}
-
-              <Separator />
-
               {/* Tipai */}
               <div className="space-y-4">
                 <Label className="text-base">Pranešimų tipai</Label>
@@ -242,19 +204,6 @@ export default function SettingsPage() {
                     onCheckedChange={setFriendRequests}
                   />
                 </div>
-
-                {/* <div className="flex items-center justify-between pl-4">
-                  <div className="space-y-0.5">
-                    <Label>Grupės kvietimai</Label>
-                    <p className="text-sm text-gray-600">
-                      Kai esate pakviesti į grupę
-                    </p>
-                  </div>
-                  <Switch
-                    checked={groupInvites}
-                    onCheckedChange={setGroupInvites}
-                  />
-                </div> */}
 
                 <div className="flex items-center justify-between pl-4">
                   <div className="space-y-0.5">
