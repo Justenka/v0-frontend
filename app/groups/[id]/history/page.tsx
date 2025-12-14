@@ -224,7 +224,7 @@ export default function GroupHistoryPage() {
               </h3>
               <div className="space-y-3">
                 {activitiesForDay.map((activity) => {
-                  const Icon = activityIcons[activity.type]
+                  const Icon = activityIcons[activity.type] ?? History
                   const colorClass = activityColors[activity.type]
 
                   return (

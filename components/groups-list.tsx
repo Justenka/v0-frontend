@@ -103,21 +103,6 @@ export default function GroupsList() {
             <Card className="hover:bg-muted/50 transition-colors">
               <CardContent className="p-4 flex justify-between items-center">
                 <h3 className="font-medium">{group.pavadinimas}</h3>
-                <Badge
-                  variant={
-                    yourBalance === 0
-                      ? "outline"
-                      : yourBalance > 0
-                        ? "success"
-                        : "destructive"
-                  }
-                >
-                  {yourBalance > 0
-                    ? `Jums priklauso ${formatCurrency(yourBalance)}`
-                    : yourBalance < 0
-                      ? `Jūs skolingi ${formatCurrency(Math.abs(yourBalance))}`
-                      : `Atsiskaityta`}
-                </Badge>
               </CardContent>
             </Card>
           </Link>

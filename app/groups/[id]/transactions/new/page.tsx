@@ -178,68 +178,67 @@ export default function NaujaIslaidaPuslapis() {
       }
 
       // ✅ FIX: Properly prepare the request payload
-    const payload: any = {
-      groupId,
-      title: title.trim(),
-      description: "", // Empty description - backend will create metadata
-      amount: Number.parseFloat(amount),
-      currencyCode: currency,
-      paidByUserId: Number(paidByMember.id),
-      categoryId: categoryId || undefined,
-      splitType: splitType as "equal" | "percentage" | "dynamic",
-      splits,
-    };
+      const payload: any = {
+        groupId,
+        title: title.trim(),
+        description: "", // Empty description - backend will create metadata
+        amount: Number.parseFloat(amount),
+        currencyCode: currency,
+        paidByUserId: Number(paidByMember.id),
+        categoryId: categoryId || undefined,
+        splitType: splitType as "equal" | "percentage" | "dynamic",
+        splits,
+      };
 
-    // ✅ CRITICAL FIX: Only add late fee fields if they're enabled and valid
-    if (enableLateFee) {
-      const feePercentage = lateFeePercentage?.trim();
-      const feeDays = lateFeeDays?.trim();
-      
-      console.log('🔍 Late fee debug:', {
-        enableLateFee,
-        lateFeePercentage,
-        feePercentage,
-        feeDays
-      });
+      // ✅ CRITICAL FIX: Only add late fee fields if checkbox is enabled AND valid values exist
+      if (enableLateFee) {
+        const feePercentage = lateFeePercentage?.trim();
+        const feeDays = lateFeeDays?.trim();
 
-      if (feePercentage && feePercentage !== '' && feePercentage !== '0') {
-        const parsedPercentage = Number.parseFloat(feePercentage);
-        
-        if (!isNaN(parsedPercentage) && parsedPercentage > 0) {
-          payload.lateFeePercentage = parsedPercentage;
-          payload.lateFeeAfterDays = feeDays ? Number(feeDays) : 7;
-          
-          console.log('✅ Adding late fee to payload:', {
-            lateFeePercentage: payload.lateFeePercentage,
-            lateFeeAfterDays: payload.lateFeeAfterDays
-          });
+        // Only add if percentage is valid and greater than 0
+        if (feePercentage && feePercentage !== '' && feePercentage !== '0') {
+          const parsedPercentage = Number.parseFloat(feePercentage);
+          const parsedDays = feeDays ? Number(feeDays) : 7;
+
+          if (!isNaN(parsedPercentage) && parsedPercentage > 0 && parsedDays >= 1) {
+            payload.lateFeePercentage = parsedPercentage;
+            payload.lateFeeAfterDays = parsedDays;
+
+            console.log('✅ Adding late fee to payload:', {
+              lateFeePercentage: payload.lateFeePercentage,
+              lateFeeAfterDays: payload.lateFeeAfterDays
+            });
+          } else {
+            console.warn('⚠️ Invalid late fee values, not adding to payload');
+          }
         } else {
-          console.warn('⚠️ Invalid late fee percentage:', feePercentage);
+          console.log('ℹ️ Late fee checkbox enabled but no percentage specified');
         }
+      } else {
+        console.log('ℹ️ Late fees disabled - not adding to payload');
       }
+
+      // Log the complete payload before sending
+      console.log('📤 Final payload:', JSON.stringify(payload, null, 2));
+
+      await groupApi.createDebt(payload, Number(user.id))
+
+      toast.success("Išlaida sėkmingai pridėta!")
+      router.push(`/groups/${groupId}`)
+    } catch (error: any) {
+      console.error("Klaida kuriant išlaidą:", error)
+
+      if (error.message.includes("jau egzistuoja")) {
+        setTitleError(error.message)
+        toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
+        setCurrentStep(0)
+      } else {
+        toast.error(error.message || "Nepavyko pridėti išlaidos")
+      }
+    } finally {
+      setIsSubmitting(false)
     }
-
-    // Log the complete payload before sending
-    console.log('📤 Final payload:', JSON.stringify(payload, null, 2));
-
-    await groupApi.createDebt(payload, Number(user.id))
-
-    toast.success("Išlaida sėkmingai pridėta!")
-    router.push(`/groups/${groupId}`)
-  } catch (error: any) {
-    console.error("Klaida kuriant išlaidą:", error)
-
-    if (error.message.includes("jau egzistuoja")) {
-      setTitleError(error.message)
-      toast.error("Išlaida su tokiu pavadinimu jau egzistuoja")
-      setCurrentStep(0)
-    } else {
-      toast.error(error.message || "Nepavyko pridėti išlaidos")
-    }
-  } finally {
-    setIsSubmitting(false)
   }
-}
 
   const handlePercentageChange = (memberId: number, value: string) => {
     setPercentages({ ...percentages, [memberId]: value })

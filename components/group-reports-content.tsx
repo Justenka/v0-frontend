@@ -1,25 +1,52 @@
 "use client"
 
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Download, TrendingUp, TrendingDown, DollarSign, Users, Calendar } from "lucide-react"
-import type { Group } from "@/types/group"
-import type { Transaction } from "@/types/transaction"
+import { Download, TrendingUp, TrendingDown, DollarSign, Users, Calendar, Loader2 } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
+
+interface Member {
+  id: number
+  name: string
+  balance: number
+}
+
+interface Transaction {
+  id: number
+  description: string
+  amount: number
+  date: string
+  paidBy: string
+  category: string
+  currency: string
+}
 
 interface GroupReportsContentProps {
-  group: Group
+  groupId: number
+  groupTitle: string
+  members: Member[]
   transactions: Transaction[]
 }
 
-export function GroupReportsContent({ group, transactions }: GroupReportsContentProps) {
+export function GroupReportsContent({ groupId, groupTitle, members, transactions }: GroupReportsContentProps) {
+  const [isExporting, setIsExporting] = useState(false)
+  const { user } = useAuth()
+
+  if (!user) {
+    toast.error("Prašome prisijungti")
+    return
+  }
+  
   // Calculate statistics
   const totalExpenses = transactions.reduce((sum, t) => sum + t.amount, 0)
   const totalTransactions = transactions.length
   const averageExpense = totalExpenses / totalTransactions || 0
 
   // Calculate per member statistics
-  const memberStats = group.members.map((member) => {
+  const memberStats = members.map((member) => {
     const paidTransactions = transactions.filter((t) => t.paidBy === member.name)
     const totalPaid = paidTransactions.reduce((sum, t) => sum + t.amount, 0)
     const transactionCount = paidTransactions.length
@@ -46,40 +73,105 @@ export function GroupReportsContent({ group, transactions }: GroupReportsContent
     {} as Record<string, { total: number; count: number }>,
   )
 
-  const handleExport = (format: "csv" | "pdf") => {
-    // MOCK: Export functionality
-    // REAL IMPLEMENTATION with MySQL/phpMyAdmin:
-    // const response = await fetch(`/api/groups/${group.id}/reports/export?format=${format}`)
-    // const blob = await response.blob()
-    // const url = window.URL.createObjectURL(blob)
-    // const a = document.createElement('a')
-    // a.href = url
-    // a.download = `${group.title}-report.${format}`
-    // a.click()
-    // SQL Query for data:
-    // SELECT t.*, m.name as member_name
-    // FROM transactions t
-    // JOIN members m ON t.paid_by = m.id
-    // WHERE t.group_id = ?
-    // ORDER BY t.date DESC
-    alert(`Eksportuojama ${format.toUpperCase()} ataskaita...`)
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/groups/${groupId}/reports/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/pdf',
+          'x-user-id': String(user.id),
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to generate PDF")
+      }
+
+      // Get the PDF blob
+      const blob = await response.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `ataskaita-${groupTitle}-${new Date().toISOString().split("T")[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      toast.success("PDF ataskaita sėkmingai sugeneruota ir atsisiųsta")
+    } catch (error) {
+      console.error("Error exporting PDF:", error)
+      toast.error(error instanceof Error ? error.message : "Nepavyko sugeneruoti PDF ataskaitos")
+    } finally {
+      setIsExporting(false)
+    }
   }
+
+  const handleExportCSV = () => {
+  try {
+    // Generate CSV content with semicolon separator
+    const headers = ["Data", "Pavadinimas", "Suma", "Valiuta", "Sumokėjo", "Kategorija"]
+    const rows = transactions.map((t) => [
+      new Date(t.date).toLocaleDateString("lt-LT"),
+      t.description,
+      t.amount.toFixed(2),
+      t.currency,
+      t.paidBy,
+      t.category,
+    ])
+
+    // Use semicolon as separator
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(";"))
+      .join("\n")
+
+    // Create blob and download
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `ataskaita-${groupTitle}-${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+
+    toast.success("CSV ataskaita sėkmingai sugeneruota ir atsisiųsta")
+  } catch (error) {
+    console.error("Error exporting CSV:", error)
+    toast.error("Nepavyko sugeneruoti CSV ataskaitos")
+  }
+}
 
   return (
     <div className="container mx-auto p-4 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">{group.title} - Ataskaitos</h1>
+          <h1 className="text-3xl font-bold">{groupTitle} - Ataskaitos</h1>
           <p className="text-muted-foreground">Išsamios finansinės ataskaitos ir statistika</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => handleExport("csv")}>
+          <Button variant="outline" onClick={handleExportCSV} disabled={isExporting}>
             <Download className="h-4 w-4 mr-2" />
             CSV
           </Button>
-          <Button variant="outline" onClick={() => handleExport("pdf")}>
-            <Download className="h-4 w-4 mr-2" />
-            PDF
+          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting}>
+            {isExporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generuojama...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                PDF
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -114,7 +206,7 @@ export function GroupReportsContent({ group, transactions }: GroupReportsContent
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{group.members.length}</div>
+            <div className="text-2xl font-bold">{members.length}</div>
             <p className="text-xs text-muted-foreground">Aktyvių narių</p>
           </CardContent>
         </Card>
