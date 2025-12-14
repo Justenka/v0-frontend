@@ -168,19 +168,6 @@ export function GroupSettingsDialog({
 }
 
 
-  const handleRemoveMember = (memberId: string) => {
-    toast.success("Narys pašalintas iš grupės")
-
-    // Real implementation:
-    /*
-    await supabase
-      .from('group_permissions')
-      .delete()
-      .eq('group_id', groupId)
-      .eq('user_id', memberId)
-    */
-  }
-
   const getRoleBadgeVariant = (role: UserRole) => {
     switch (role) {
       case "admin":
@@ -289,15 +276,7 @@ export function GroupSettingsDialog({
                               </p>
                             )}
 
-                            {member.role !== "admin" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveMember(member.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            )}
+
                           </>
                         ) : (
                           <Badge variant={getRoleBadgeVariant(member.role)}>{getRoleLabel(member.role)}</Badge>

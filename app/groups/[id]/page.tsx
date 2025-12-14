@@ -501,7 +501,6 @@ export default function GroupPage() {
                 onEdit={isPublicView ? undefined : handleEditTransaction}
                 onDelete={isPublicView ? undefined : handleDeleteTransaction}
                 onSave={refreshGroupData}
-                isPublicView={isPublicView}
               />
             </CardContent>
           </Card>
