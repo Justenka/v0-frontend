@@ -68,6 +68,7 @@ export function EditTransactionDialog({
         setDuplicateWarning(result.exists)
       } catch (error) {
         console.error("Error checking duplicate:", error)
+        setDuplicateWarning(false)
       } finally {
         setCheckingDuplicate(false)
       }
