@@ -491,18 +491,18 @@ export default function AddMemberDialog({ open, onOpenChange, onAddMember, exist
                   <Button onClick={handleCopyPublicLink} variant="outline" size="icon" type="button" title="Kopijuoti">
                     {publicLinkCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                   </Button>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <p className="text-sm text-amber-900">
-                    <strong>Pastaba:</strong> Ši nuoroda:
-                  </p>
-                  <ul className="text-sm text-amber-800 mt-2 ml-4 space-y-1 list-disc">
-                    <li>Leidžia matyti <strong>tik išlaidas</strong> (eurais)</li>
-                    <li>Neleidžia matyti narių balansų</li>
-                    <li>Neleidžia pridėti ar redaguoti išlaidų</li>
-                    <li>Neleidžia matyti pokalbių</li>
-                    <li>Galioja visada (niekada nebaigiasi)</li>
-                  </ul>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-900">
+                      <strong>Pastaba:</strong> Ši nuoroda:
+                    </p>
+                    <ul className="text-sm text-amber-800 mt-2 ml-4 space-y-1 list-disc">
+                      <li>Leidžia matyti <strong>tik išlaidas</strong> (eurais)</li>
+                      <li>Neleidžia matyti narių balansų</li>
+                      <li>Neleidžia pridėti ar redaguoti išlaidų</li>
+                      <li>Neleidžia matyti pokalbių</li>
+                      <li>Galioja visada (niekada nebaigiasi)</li>
+                    </ul>
                   </div>
               </div>
             </TabsContent>
